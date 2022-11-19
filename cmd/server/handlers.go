@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -70,7 +69,7 @@ func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 			http.Error(w, "You haven`t opened the database connection", http.StatusInternalServerError)
 			return
 		}
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 
 		if err != nil {
 			log.Println(err)
