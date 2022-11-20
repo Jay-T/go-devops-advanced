@@ -63,7 +63,7 @@ func GetBody(r *http.Request) (*Metric, error) {
 
 type Service struct {
 	cfg Config
-	db  DB
+	db  *sql.DB
 }
 
 func (s Service) saveMetric(ctx context.Context, m *Metric) {

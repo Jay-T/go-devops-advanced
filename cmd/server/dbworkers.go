@@ -21,7 +21,6 @@ func (s Service) DBInit(ctx context.Context) error {
 }
 
 func (s Service) RestoreMetricFromDB(ctx context.Context) error {
-	var rows Rows
 	recs := make([]Metric, 0)
 	qry := `
 		SELECT * FROM metrics
