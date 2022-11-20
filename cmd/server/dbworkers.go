@@ -59,18 +59,22 @@ func (s Service) SaveMetricToDB(ctx context.Context) error {
 			value = $4
 	`
 	tx, err := s.db.Begin()
-	defer tx.Commit()
 	if err != nil {
 		return err
 	}
 	stmt, err := tx.PrepareContext(ctx, addRecord)
+	if err != nil {
+		return err
+	}
 	for _, metric := range metrics {
 		_, err := stmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
 		if err != nil {
 			log.Println(err)
+			tx.Rollback()
 			return err
 		}
 	}
+	tx.Commit()
 	return nil
 }
 

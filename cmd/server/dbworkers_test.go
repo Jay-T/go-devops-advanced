@@ -143,13 +143,15 @@ func TestSaveMetricToDB(t *testing.T) {
 	}
 
 	metric := metrics["Alloc"]
-	mock.ExpectExec(`INSERT INTO metrics`).
+	mock.ExpectBegin()
+	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().
 		WithArgs(metric.ID, metric.MType, metric.Delta, metric.Value).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	err = s.SaveMetricToDB(ctx)
 	assert.NoError(t, err)
 
-	mock.ExpectExec(`INSERT INTO metrics`).
+	mock.ExpectBegin()
+	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().
 		WithArgs(metric.ID, metric.MType, metric.Delta, metric.Value).
 		WillReturnError(New("TestError"))
 	err = s.SaveMetricToDB(ctx)
