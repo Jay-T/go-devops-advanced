@@ -26,7 +26,7 @@ func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 		dataMap[key] = floatVal
 	}
 
-	htmlPage, err := os.ReadFile("metrics.html") // TODO: Fix file path relation
+	htmlPage, err := os.ReadFile("cmd/server/metrics.html") // TODO: Fix file path relation
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)

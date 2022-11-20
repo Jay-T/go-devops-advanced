@@ -266,6 +266,7 @@ func TestSetMetricListHandler(t *testing.T) {
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
+			defer res.Body.Close()
 			assert.Equal(t, res.StatusCode, tt.want)
 
 		})
@@ -292,6 +293,7 @@ func TestPingDBHandler(t *testing.T) {
 	h.ServeHTTP(w, request)
 	res := w.Result()
 	assert.Equal(t, res.StatusCode, 200)
+	res.Body.Close()
 
 	mock.ExpectPing().WillReturnError(New("TestError"))
 	w = httptest.NewRecorder()
@@ -299,5 +301,6 @@ func TestPingDBHandler(t *testing.T) {
 
 	h.ServeHTTP(w, request)
 	res = w.Result()
+	defer res.Body.Close()
 	assert.Equal(t, res.StatusCode, 500)
 }

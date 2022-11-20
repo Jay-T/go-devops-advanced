@@ -82,7 +82,7 @@ func (s Service) saveMetric(ctx context.Context, m *Metric) {
 	if s.db != nil {
 		err := s.SaveMetricToDB(ctx)
 		if err != nil {
-			log.Printf(err.Error())
+			log.Print(err.Error())
 		}
 	} else if s.cfg.StoreFile != "" && s.cfg.StoreInterval == time.Duration(0) {
 		s.SaveMetricToFile()
@@ -124,7 +124,7 @@ func (s Service) StartRecordInterval(ctx context.Context) {
 			if s.db != nil {
 				err := s.SaveMetricToDB(ctx)
 				if err != nil {
-					log.Printf(err.Error())
+					log.Print(err.Error())
 				}
 			} else {
 				s.SaveMetricToFile()
@@ -268,7 +268,7 @@ func main() {
 	if s.db != nil {
 		err := s.SaveMetricToDB(ctx)
 		if err != nil {
-			log.Printf(err.Error())
+			log.Print(err.Error())
 		}
 	} else {
 		s.SaveMetricToFile()

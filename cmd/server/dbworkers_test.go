@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql/driver"
 	"testing"
 	"time"
 
@@ -73,13 +72,6 @@ func New(text string) error {
 
 type MetricMatcher struct{}
 
-func (mm MetricMatcher) Match(v driver.Value) bool {
-	_, ok := v.(string)
-	_, ok = v.(*int64)
-	_, ok = v.(*float64)
-	return ok
-}
-
 func TestDBInit(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
@@ -120,7 +112,7 @@ func TestRestoreMetricFromDB(t *testing.T) {
 		WillDelayFor(1 * time.Second).
 		WillReturnRows(rs)
 
-	err = s.RestoreMetricFromDB(ctx)
+	s.RestoreMetricFromDB(ctx)
 	assert.Equal(t, metrics["Alloc"], Metric{
 		ID:    "Alloc",
 		MType: gauge,
