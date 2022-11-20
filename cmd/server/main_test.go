@@ -14,8 +14,9 @@ import (
 type MetricNew struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta *float64 `json:"delta,omitempty"` // значение метрики в случае передачи counter
+	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
 	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
+	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
 func getFloatPointer(val float64) *float64 {
@@ -122,55 +123,74 @@ func TestGetBody(t *testing.T) {
 	}
 }
 
-func TestSetMetricHandler(t *testing.T) {
-	tests := []struct {
-		name     string
-		metric   MetricNew
-		wantCode int
-	}{
-		{
-			name: "Test One",
-			metric: MetricNew{
-				ID:    "Alloc",
-				MType: gauge,
-				Value: getFloatPointer(4),
-			},
-			wantCode: 200,
-		},
-		{
-			name: "Test Two",
-			metric: MetricNew{
-				ID:    "PollCount",
-				MType: counter,
-				Delta: getFloatPointer(4.5),
-			},
-			wantCode: 500,
+func BenchmarkSetMetricHandler(b *testing.B) {
+	s := Service{
+		cfg: Config{
+			Address:       "localhost:8080",
+			StoreInterval: 10,
+			StoreFile:     "file.json",
+			Restore:       true,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			s := Service{
-				cfg: Config{
-					Address:       "localhost:8080",
-					StoreInterval: 10,
-					StoreFile:     "file.json",
-					Restore:       true,
-				},
-			}
+	// triesN := 1
 
-			mSer, _ := json.Marshal(tt.metric)
-			request := httptest.NewRequest(http.MethodPost, "http://localhost", bytes.NewBuffer(mSer))
-			w := httptest.NewRecorder()
-
-			ctx := context.TODO()
-
-			h := http.HandlerFunc(s.SetMetricHandler(ctx))
-
-			h.ServeHTTP(w, request)
-			res := w.Result()
-
-			assert.Equal(t, tt.wantCode, res.StatusCode)
-			defer res.Body.Close()
-		})
+	data := MetricNew{
+		ID:    "Alloc",
+		MType: gauge,
+		Value: getFloatPointer(4),
 	}
+
+	mSer, _ := json.Marshal(data)
+
+	w := httptest.NewRecorder()
+
+	ctx := context.TODO()
+
+	requestPost := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(mSer))
+	h := http.HandlerFunc(s.SetMetricHandler(ctx))
+	b.ResetTimer()
+	b.Run("SetMetricHandler", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			h.ServeHTTP(w, requestPost)
+		}
+	})
+
+	requestPost = httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewBuffer(mSer))
+	h = http.HandlerFunc(s.SetMetricListHandler(ctx))
+	b.ResetTimer()
+	b.Run("SetMetricListHandler", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			h.ServeHTTP(w, requestPost)
+		}
+	})
+
+	requestPost = httptest.NewRequest(http.MethodPost, "/update/gauge/Alloc/2", nil)
+	h = http.HandlerFunc(s.SetMetricOldHandler(ctx))
+	b.ResetTimer()
+	b.Run("SetMetricOldHandlerGauge", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			h.ServeHTTP(w, requestPost)
+		}
+	})
+
+	requestPost = httptest.NewRequest(http.MethodPost, "/update/counter/PollCount/2", nil)
+	h = http.HandlerFunc(s.SetMetricOldHandler(ctx))
+	b.ResetTimer()
+	b.Run("SetMetricOldHandlerCounter", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			h.ServeHTTP(w, requestPost)
+		}
+	})
+
+}
+
+func BenchmarkGetAllMetricHandler(b *testing.B) {
+	w := httptest.NewRecorder()
+	requestGet := httptest.NewRequest(http.MethodGet, "/", nil)
+	h := http.HandlerFunc(GetAllMetricHandler)
+	b.Run("GetAllMetricHandler", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			h.ServeHTTP(w, requestGet)
+		}
+	})
 }

@@ -12,6 +12,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"runtime"
@@ -302,7 +303,7 @@ func main() {
 	address = flag.String("a", "localhost:8080", "Address for sending data to")
 	reportInterval = flag.Duration("r", time.Duration(10*time.Second), "Metric report to server interval")
 	pollInterval = flag.Duration("p", time.Duration(2*time.Second), "Metric poll interval")
-	key = flag.String("k", "", "Encryption key")
+	key = flag.String("k", "testkey", "Encryption key")
 	flag.Parse()
 	RewriteConfigWithEnvs(&a)
 
