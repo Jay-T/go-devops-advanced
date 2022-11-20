@@ -5,7 +5,7 @@ import (
 	"log"
 )
 
-func (s Service) DBInit(ctx context.Context) {
+func (s Service) DBInit(ctx context.Context) error {
 	const qry = `
 		CREATE TABLE IF NOT EXISTS metrics (
 			id text PRIMARY KEY,
@@ -15,11 +15,13 @@ func (s Service) DBInit(ctx context.Context) {
 		)`
 	if _, err := s.db.ExecContext(ctx, qry); err != nil {
 		log.Println(err)
-		return
+		return err
 	}
+	return nil
 }
 
 func (s Service) RestoreMetricFromDB(ctx context.Context) error {
+	var rows Rows
 	recs := make([]Metric, 0)
 	qry := `
 		SELECT * FROM metrics
@@ -49,7 +51,7 @@ func (s Service) RestoreMetricFromDB(ctx context.Context) error {
 	return nil
 }
 
-func (s Service) SaveMetricToDB(ctx context.Context) {
+func (s Service) SaveMetricToDB(ctx context.Context) error {
 	addRecord := `
 		INSERT INTO metrics (id, mtype, delta, value) 
 		VALUES ($1, $2, $3, $4)
@@ -61,9 +63,10 @@ func (s Service) SaveMetricToDB(ctx context.Context) {
 		_, err := s.db.ExecContext(ctx, addRecord, metric.ID, metric.MType, metric.Delta, metric.Value)
 		if err != nil {
 			log.Println(err)
-			return
+			return err
 		}
 	}
+	return nil
 }
 
 func (s Service) saveListToDB(ctx context.Context, mList *[]Metric) error {

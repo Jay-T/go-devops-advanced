@@ -17,7 +17,8 @@ import (
 	"time"
 
 	"github.com/caarlos0/env"
-	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
 )
 
@@ -62,7 +63,7 @@ func GetBody(r *http.Request) (*Metric, error) {
 
 type Service struct {
 	cfg Config
-	db  *sql.DB
+	db  DB
 }
 
 func (s Service) saveMetric(ctx context.Context, m *Metric) {
@@ -79,7 +80,10 @@ func (s Service) saveMetric(ctx context.Context, m *Metric) {
 		log.Printf("Metric type '%s' is not expected. Skipping.", m.MType)
 	}
 	if s.db != nil {
-		s.SaveMetricToDB(ctx)
+		err := s.SaveMetricToDB(ctx)
+		if err != nil {
+			log.Printf(err.Error())
+		}
 	} else if s.cfg.StoreFile != "" && s.cfg.StoreInterval == time.Duration(0) {
 		s.SaveMetricToFile()
 	}
@@ -118,7 +122,10 @@ func (s Service) StartRecordInterval(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			if s.db != nil {
-				s.SaveMetricToDB(ctx)
+				err := s.SaveMetricToDB(ctx)
+				if err != nil {
+					log.Printf(err.Error())
+				}
 			} else {
 				s.SaveMetricToFile()
 			}
@@ -132,6 +139,7 @@ func (s Service) StartRecordInterval(ctx context.Context) {
 func (s Service) StartServer(ctx context.Context) {
 	r := chi.NewRouter()
 	r.Use(gzipHandle)
+	r.Mount("/debug", middleware.Profiler())
 	// old methods
 	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
 	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
@@ -144,6 +152,7 @@ func (s Service) StartServer(ctx context.Context) {
 	r.Post("/updates/", s.SetMetricListHandler(ctx))
 	r.Post("/value/", s.GetMetricHandler)
 	r.Get("/ping", s.PingDBHandler)
+
 	srv := &http.Server{
 		Addr:    s.cfg.Address,
 		Handler: r,
@@ -257,7 +266,10 @@ func main() {
 
 	<-sigChan
 	if s.db != nil {
-		s.SaveMetricToDB(ctx)
+		err := s.SaveMetricToDB(ctx)
+		if err != nil {
+			log.Printf(err.Error())
+		}
 	} else {
 		s.SaveMetricToFile()
 	}

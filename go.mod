@@ -3,6 +3,7 @@ module github.com/Jay-T/go-devops.git
 go 1.16
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/caarlos0/env v3.5.0+incompatible // indirect
 	github.com/caarlos0/env/v6 v6.8.0
 	github.com/go-chi/chi v1.5.4

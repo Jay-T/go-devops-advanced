@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -198,6 +199,75 @@ func TestGzipHandle(t *testing.T) {
 
 			h0.ServeHTTP(w, request)
 			assert.Equal(t, tt.want, strings.Contains(w.Header().Get("Content-Encoding"), "gzip"))
+		})
+	}
+}
+
+func TestSetMetricListHandler(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+	ctx := context.TODO()
+
+	s := Service{
+		db: db,
+	}
+
+	tests := []struct {
+		name string
+		ml   []Metric
+		m    Metric
+		want int
+	}{
+		{
+			name: "Test One",
+			ml: []Metric{
+				{
+					ID:    "Alloc",
+					MType: gauge,
+					Value: getFloatPointer(354872),
+					Hash:  "a2bc398d457f8e417dce8776440f230519f0ee5e2a0cf96130cc631272a9987b",
+				},
+			},
+			m:    Metric{},
+			want: 200,
+		},
+		{
+			name: "Test Two",
+			ml:   []Metric{},
+			m: Metric{
+				ID:    "Alloc",
+				MType: gauge,
+				Value: getFloatPointer(354872),
+				Hash:  "a2bc398d457f8e417dce8776440f230519f0ee5e2a0cf96130cc631272a9987b",
+			},
+			want: 500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mSer []byte
+			if len(tt.ml) > 0 {
+				mSer, _ = json.Marshal(tt.ml)
+			} else {
+				mSer, _ = json.Marshal(tt.m)
+			}
+			request := httptest.NewRequest(http.MethodPost, "/", bytes.NewBuffer(mSer))
+			w := httptest.NewRecorder()
+
+			mock.ExpectBegin()
+			mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
+			mock.ExpectCommit()
+
+			h := http.HandlerFunc(s.SetMetricListHandler(ctx))
+
+			h.ServeHTTP(w, request)
+			res := w.Result()
+			assert.Equal(t, res.StatusCode, tt.want)
+
 		})
 	}
 }
