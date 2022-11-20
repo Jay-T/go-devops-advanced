@@ -271,3 +271,33 @@ func TestSetMetricListHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestPingDBHandler(t *testing.T) {
+	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer db.Close()
+
+	s := Service{
+		db: db,
+	}
+
+	request := httptest.NewRequest(http.MethodPost, "/", nil)
+
+	mock.ExpectPing()
+	w := httptest.NewRecorder()
+	h := http.HandlerFunc(s.PingDBHandler)
+
+	h.ServeHTTP(w, request)
+	res := w.Result()
+	assert.Equal(t, res.StatusCode, 200)
+
+	mock.ExpectPing().WillReturnError(New("TestError"))
+	w = httptest.NewRecorder()
+	h = http.HandlerFunc(s.PingDBHandler)
+
+	h.ServeHTTP(w, request)
+	res = w.Result()
+	assert.Equal(t, res.StatusCode, 500)
+}
