@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -57,7 +57,7 @@ func TestSetMetricOldHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				cfg: Config{
+				Cfg: Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
@@ -125,7 +125,7 @@ func TestGetBody(t *testing.T) {
 
 func BenchmarkSetMetricHandler(b *testing.B) {
 	s := Service{
-		cfg: Config{
+		Cfg: Config{
 			Address:       "localhost:8080",
 			StoreInterval: 10,
 			StoreFile:     "file.json",

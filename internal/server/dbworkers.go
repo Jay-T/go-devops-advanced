@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -14,7 +14,7 @@ func (s Service) DBInit(ctx context.Context) error {
 			delta bigint,
 			value double precision
 		)`
-	if _, err := s.db.ExecContext(ctx, qry); err != nil {
+	if _, err := s.DB.ExecContext(ctx, qry); err != nil {
 		log.Println(err)
 		return err
 	}
@@ -27,7 +27,7 @@ func (s Service) RestoreMetricFromDB(ctx context.Context) error {
 	qry := `
 		SELECT * FROM metrics
 	`
-	rows, err := s.db.QueryContext(ctx, qry)
+	rows, err := s.DB.QueryContext(ctx, qry)
 	if err != nil {
 		return err
 	}
@@ -61,7 +61,7 @@ func (s Service) SaveMetricToDB(ctx context.Context) error {
 		SET delta = $3,
 			value = $4
 	`
-	tx, err := s.db.Begin()
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (s Service) SaveMetricToDB(ctx context.Context) error {
 }
 
 func (s Service) saveListToDB(ctx context.Context, mList *[]Metric) error {
-	tx, err := s.db.Begin()
+	tx, err := s.DB.Begin()
 	if err != nil {
 		return err
 	}

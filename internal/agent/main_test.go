@@ -1,4 +1,4 @@
-package main
+package agent
 
 import (
 	"log"
@@ -56,7 +56,7 @@ func Test_SendData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := env.Parse(&a.cfg)
+			err := env.Parse(&a.Cfg)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -119,7 +119,7 @@ func Test_SendDataOld(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Agent{
-				cfg: Config{
+				Cfg: Config{
 					Address:        "localhost:8080",
 					ReportInterval: 10,
 					PollInterval:   2,

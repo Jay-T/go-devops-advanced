@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -81,7 +81,7 @@ func TestDBInit(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		db: db,
+		DB: db,
 	}
 
 	mock.ExpectExec(".*").WillReturnResult(sqlmock.NewResult(1, 1))
@@ -103,7 +103,7 @@ func TestRestoreMetricFromDB(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		db: db,
+		DB: db,
 	}
 
 	rs := sqlmock.NewRows([]string{"id", "mtype", "delta", "value"}).AddRow("Alloc", "gauge", "0", "23456")
@@ -130,7 +130,7 @@ func TestSaveMetricToDB(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		db: db,
+		DB: db,
 	}
 
 	metrics = map[string]Metric{
@@ -167,7 +167,7 @@ func TestSaveListToDB(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		db: db,
+		DB: db,
 	}
 	mList := []Metric{
 		{

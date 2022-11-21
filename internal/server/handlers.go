@@ -1,19 +1,22 @@
-package main
+package server
 
 import (
 	"compress/gzip"
 	"context"
 	"crypto/hmac"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"text/template"
 	"time"
 )
+
+//go:embed metrics.html
+var htmlPage []byte
 
 // GetAllMetricHandler returns HTML page with all metrics values.
 // URI: /.
@@ -28,11 +31,6 @@ func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 		dataMap[key] = floatVal
 	}
 
-	htmlPage, err := os.ReadFile("cmd/server/metrics.html") // TODO(daniliuk-ve): Fix file path relation
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
 	w.Header().Set("Content-Type", "text/html")
 	tmpl := template.Must(template.New("").Parse(string(htmlPage)))
 	tmpl.Execute(w, dataMap)
@@ -44,7 +42,7 @@ func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := GetBody(r)
 
-		if s.cfg.Key != "" {
+		if s.Cfg.Key != "" {
 			localHash := s.GenerateHash(m)
 			remoteHash, err := hex.DecodeString(m.Hash)
 			if err != nil {
@@ -71,7 +69,7 @@ func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 // URI: "/updates/".
 func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.db == nil {
+		if s.DB == nil {
 			http.Error(w, "You haven`t opened the database connection", http.StatusInternalServerError)
 			return
 		}
@@ -107,7 +105,7 @@ func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if s.cfg.Key != "" {
+	if s.Cfg.Key != "" {
 		data.Hash = hex.EncodeToString(s.GenerateHash(&data))
 	}
 
@@ -162,7 +160,7 @@ func gzipHandle(next http.Handler) http.Handler {
 func (s Service) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	if err := s.db.PingContext(ctx); err != nil {
+	if err := s.DB.PingContext(ctx); err != nil {
 		log.Println(err)
 		http.Error(w, "Error in DB connection.", http.StatusInternalServerError)
 		return

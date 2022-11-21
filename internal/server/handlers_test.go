@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -53,7 +53,7 @@ func TestSetMetricHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				cfg: Config{
+				Cfg: Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
@@ -109,7 +109,7 @@ func TestGetMetricHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				cfg: Config{
+				Cfg: Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
@@ -154,7 +154,7 @@ func TestGenerateHash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				cfg: Config{
+				Cfg: Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
@@ -212,7 +212,7 @@ func TestSetMetricListHandler(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		db: db,
+		DB: db,
 	}
 
 	tests := []struct {
@@ -281,7 +281,7 @@ func TestPingDBHandler(t *testing.T) {
 	defer db.Close()
 
 	s := Service{
-		db: db,
+		DB: db,
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/", nil)
