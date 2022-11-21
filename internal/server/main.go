@@ -29,6 +29,17 @@ const (
 var metrics = make(map[string]Metric)
 var dataMap = make(map[string]float64)
 
+// vars for application configuration.
+var (
+	address       *string
+	restore       *bool
+	storeInterval *time.Duration
+	storeFile     *string
+	s             Service
+	key           *string
+	db            *string
+)
+
 // Config structure. Used for application configuration.
 type Config struct {
 	Address       string        `env:"ADDRESS" envDefault:"127.0.0.1:8080"`
@@ -41,11 +52,11 @@ type Config struct {
 
 // Metric struct. Describes metric message format.
 type Metric struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
+	ID    string   `json:"id"`              // metric's name
+	MType string   `json:"type"`            // parameter taking value of gauge or counter
+	Delta *int64   `json:"delta,omitempty"` // metric value in case of MType == counter
+	Value *float64 `json:"value,omitempty"` // metric value in case of MType == gauge
+	Hash  string   `json:"hash,omitempty"`  // hash value
 }
 
 // GetBody parses HTTP request's body and returns Metric.
@@ -69,6 +80,7 @@ type Service struct {
 	DB  *sql.DB
 }
 
+// NewService returns Service with config parsed from flags or ENV vars.
 func NewService() (*Service, error) {
 	err := env.Parse(&s.Cfg)
 	if err != nil {
@@ -229,78 +241,3 @@ func RewriteConfigWithEnvs(s *Service) {
 		s.Cfg.DB = *db
 	}
 }
-
-var (
-	address       *string
-	restore       *bool
-	storeInterval *time.Duration
-	storeFile     *string
-	s             Service
-	key           *string
-	db            *string
-)
-
-// func main() {
-// 	// err := env.Parse(&s.Cfg)
-// 	// if err != nil {
-// 	// 	log.Fatal(err)
-// 	// }
-
-// 	// address = flag.String("a", "localhost:8080", "Socket to listen on")
-// 	// restore = flag.Bool("r", true, "Restore data from file")
-// 	// storeInterval = flag.Duration("i", time.Duration(300*time.Second), "Save data interval")
-// 	// storeFile = flag.String("f", "/tmp/devops-metrics-db.json", "File for saving data")
-// 	// key = flag.String("k", "", "Encryption key")
-// 	// db = flag.String("d", "", "Database address")
-// 	// flag.Parse()
-// 	RewriteConfigWithEnvs(&s)
-
-// 	sigChan := make(chan os.Signal, 1)
-// 	signal.Notify(sigChan,
-// 		syscall.SIGINT,
-// 		syscall.SIGTERM,
-// 		syscall.SIGQUIT)
-
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	if s.Cfg.DB != "" {
-// 		s.DB, err = sql.Open("postgres", s.Cfg.DB)
-// 		if err != nil {
-// 			log.Println(err)
-// 		}
-// 		defer s.DB.Close()
-// 		s.DBInit(ctx)
-// 	}
-
-// 	go s.StartServer(ctx)
-
-// 	if s.Cfg.Restore {
-// 		if s.DB != nil {
-// 			log.Printf("Restoring metrics from DB")
-// 			if err := s.RestoreMetricFromDB(ctx); err != nil {
-// 				log.Println(err)
-// 			}
-// 		} else if s.Cfg.StoreFile != "" {
-// 			log.Printf("Restoring metrics from file '%s'", s.Cfg.StoreFile)
-// 			if err := s.RestoreMetricFromFile(); err != nil {
-// 				log.Println(err)
-// 			}
-// 		}
-// 	}
-
-// 	if s.Cfg.StoreFile != "" && s.Cfg.StoreInterval > time.Duration(0) {
-// 		log.Printf("Saving results to file with interval %s", s.Cfg.StoreInterval)
-// 		go s.StartRecordInterval(ctx)
-// 	}
-
-// 	<-sigChan
-// 	if s.DB != nil {
-// 		err := s.SaveMetricToDB(ctx)
-// 		if err != nil {
-// 			log.Print(err.Error())
-// 		}
-// 	} else {
-// 		s.SaveMetricToFile()
-// 	}
-// 	cancel()
-// 	CloseApp()
-// }

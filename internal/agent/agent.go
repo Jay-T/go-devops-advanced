@@ -1,3 +1,4 @@
+// Application collects system metrics and sends to server.
 package agent
 
 import (
@@ -37,24 +38,29 @@ var (
 	key            *string
 )
 
+// metrics map stores all metrics in memory.
 var metrics = make(map[string]Metric)
 
+// Metric struct describes format of metric messages.
 type Metric struct {
-	ID    string   `json:"id"`              // имя метрики
-	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
-	Delta *int64   `json:"delta,omitempty"` // значение метрики в случае передачи counter
-	Value *float64 `json:"value,omitempty"` // значение метрики в случае передачи gauge
-	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
+	ID    string   `json:"id"`              // metric's name
+	MType string   `json:"type"`            // parameter taking value of gauge or counter
+	Delta *int64   `json:"delta,omitempty"` // metric value in case of MType == counter
+	Value *float64 `json:"value,omitempty"` // metric value in case of MType == gauge
+	Hash  string   `json:"hash,omitempty"`  // hash value
 }
 
+// GetValueInt returns pointer to int64 value.
 func (m Metric) GetValueInt() int64 {
 	return int64(*m.Delta)
 }
 
+// GetValueFloat returns pointer to float64 value.
 func (m Metric) GetValueFloat() float64 {
 	return *m.Value
 }
 
+// Config struct describes application config.
 type Config struct {
 	Address        string        `env:"ADDRESS" envDefault:"127.0.0.1:8080"`
 	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
@@ -62,10 +68,12 @@ type Config struct {
 	Key            string        `env:"KEY"`
 }
 
+// Agent struct accepts Config and handles all metrics manipulations.
 type Agent struct {
 	Cfg Config
 }
 
+// NewAgent configures Agent and returns pointer on it.
 func NewAgent() (*Agent, error) {
 	err := env.Parse(&a.Cfg)
 	if err != nil {
@@ -83,6 +91,7 @@ func NewAgent() (*Agent, error) {
 	return &a, nil
 }
 
+// AddHash computes hash for Metric fields for validation before sending it to server.
 func (a Agent) AddHash(m *Metric) {
 	var data string
 
@@ -119,7 +128,7 @@ func (a Agent) sendData(m *Metric) error {
 	return err
 }
 
-// Gouroutine polls memory metrics each time it receives signal from syncChan
+// GetDataByInterval gouroutine polls memory metrics each time it receives signal from syncChan.
 func (a Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, syncChan <-chan time.Time) {
 	var rtm runtime.MemStats
 
@@ -166,7 +175,8 @@ func (a Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, sync
 	}
 }
 
-// Gouroutine polls memory metrics each time it receives signal from syncChan
+// GetMemDataByInterval gouroutine polls CPU data from system.
+// Polls CPU metrics each time it receives signal from syncChan.
 func (a Agent) GetMemDataByInterval(ctx context.Context, gaugeChan chan<- Data, syncChan <-chan time.Time) {
 	for {
 		select {
@@ -182,7 +192,8 @@ func (a Agent) GetMemDataByInterval(ctx context.Context, gaugeChan chan<- Data, 
 	}
 }
 
-// Polling time here depends on internal CPUPollTime value.
+// GetCPUDataByInterval gouroutine polls MEM data from system.
+// Polls MEM metrics each time it receives signal from syncChan.
 func (a Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data) {
 	const CPUPollTime time.Duration = 10 * time.Second
 
@@ -221,6 +232,7 @@ func (a Agent) sendBulkData(mList *[]Metric) error {
 	return err
 }
 
+// SendDataByInterval gorouting sends data to server every specified interval.
 func (a Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	ticker := time.NewTicker(a.Cfg.ReportInterval)
 	for {
@@ -250,12 +262,14 @@ func (a Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	}
 }
 
+// Data struct describes message format between goroutines
 type Data struct {
 	name         string
 	gaugeValue   float64
 	counterValue int64
 }
 
+// NewMetric saves new incoming Data from channel to metric map in Metric format.
 func NewMetric(ctx context.Context, dataChan <-chan Data) {
 	var m sync.Mutex
 	for {
@@ -274,12 +288,13 @@ func NewMetric(ctx context.Context, dataChan <-chan Data) {
 	}
 }
 
+// CloseApp stops the application.
 func CloseApp() {
 	log.Println("SIGINT!")
 	os.Exit(1)
 }
 
-// Function syncronizes goroutines that poll system metrics by sending signal to syncChan;
+// RunTicker function syncronizes goroutines that poll system metrics by sending signal to syncChan.
 // Goroutines that receive signal, poll system metrics with same interval.
 func RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 	ticker := time.NewTicker(a.Cfg.PollInterval)
@@ -293,6 +308,7 @@ func RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 	}
 }
 
+// RewriteConfigWithEnvs rewrites values from ENV variables if same variable is specified as flag.
 func RewriteConfigWithEnvs(a *Agent) {
 	if _, present := os.LookupEnv("ADDRESS"); !present {
 		a.Cfg.Address = *address
@@ -307,25 +323,3 @@ func RewriteConfigWithEnvs(a *Agent) {
 		a.Cfg.Key = *key
 	}
 }
-
-// func main() {
-
-// 	sigChan := make(chan os.Signal, 1)
-// 	signal.Notify(sigChan,
-// 		syscall.SIGINT,
-// 		syscall.SIGTERM,
-// 		syscall.SIGQUIT)
-// 	dataChan := make(chan Data)
-// 	syncChan := make(chan time.Time)
-
-// 	ctx, cancel := context.WithCancel(context.Background())
-// 	go RunTicker(ctx, syncChan)
-// 	go newMetric(ctx, dataChan)
-// 	go a.getDataByInterval(ctx, dataChan, syncChan)
-// 	go a.getMemDataByInterval(ctx, dataChan, syncChan)
-// 	go a.getCPUDataByInterval(ctx, dataChan)
-// 	go a.sendDataByInterval(ctx, dataChan)
-// 	<-sigChan
-// 	cancel()
-// 	closeApp()
-// }
