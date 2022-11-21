@@ -15,6 +15,8 @@ import (
 	"time"
 )
 
+// GetAllMetricHandler returns HTML page with all metrics values.
+// URI: /.
 func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 	var floatVal float64
 	for key, val := range metrics {
@@ -26,7 +28,7 @@ func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 		dataMap[key] = floatVal
 	}
 
-	htmlPage, err := os.ReadFile("cmd/server/metrics.html") // TODO: Fix file path relation
+	htmlPage, err := os.ReadFile("cmd/server/metrics.html") // TODO(daniliuk-ve): Fix file path relation
 	if err != nil {
 		log.Println(err)
 		os.Exit(1)
@@ -36,6 +38,8 @@ func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 	tmpl.Execute(w, dataMap)
 }
 
+// SetMetricHandler saves metric from HTTP POST request.
+// URI: /update/.
 func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := GetBody(r)
@@ -63,6 +67,8 @@ func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 	})
 }
 
+// SetMetricListHandler saves a list of metrics from HTTP POST request.
+// URI: "/updates/".
 func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.db == nil {
@@ -85,6 +91,8 @@ func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 	})
 }
 
+// GetMetricHandler returns a metric which was specified in HTTP POST request.
+// URI: "/value/".
 func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	m, err := GetBody(r)
 	r.Body.Close()
@@ -111,10 +119,12 @@ func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 }
 
+// NotImplemented handler returns HTTP StatusNotImplemented (code: 501) .
 func NotImplemented(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Uknown type", http.StatusNotImplemented)
 }
 
+// NotFound handler returns HTTP StatusNotFound (code: 404).
 func NotFound(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not Found", http.StatusNotFound)
 }
@@ -147,6 +157,8 @@ func gzipHandle(next http.Handler) http.Handler {
 	})
 }
 
+// PingDBHandler checks DB connection.
+// URI: /ping.
 func (s Service) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()

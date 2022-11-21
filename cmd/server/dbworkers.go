@@ -5,6 +5,7 @@ import (
 	"log"
 )
 
+// DBInit creates table with specific structure if it is not created yet.
 func (s Service) DBInit(ctx context.Context) error {
 	const qry = `
 		CREATE TABLE IF NOT EXISTS metrics (
@@ -20,6 +21,7 @@ func (s Service) DBInit(ctx context.Context) error {
 	return nil
 }
 
+// RestoreMetricFromDB loads metrics values from DB.
 func (s Service) RestoreMetricFromDB(ctx context.Context) error {
 	recs := make([]Metric, 0)
 	qry := `
@@ -50,6 +52,7 @@ func (s Service) RestoreMetricFromDB(ctx context.Context) error {
 	return nil
 }
 
+// SaveMetricToDB saves metrics to DB.
 func (s Service) SaveMetricToDB(ctx context.Context) error {
 	addRecord := `
 		INSERT INTO metrics (id, mtype, delta, value) 

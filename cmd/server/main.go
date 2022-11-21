@@ -1,3 +1,4 @@
+// Application for receiving metrics over WEB and storing in DB.
 package main
 
 import (
@@ -30,6 +31,7 @@ const (
 var metrics = make(map[string]Metric)
 var dataMap = make(map[string]float64)
 
+// Config structure. Used for application configuration.
 type Config struct {
 	Address       string        `env:"ADDRESS" envDefault:"127.0.0.1:8080"`
 	StoreInterval time.Duration `env:"STORE_INTERVAL" envDefault:"300s"`
@@ -39,6 +41,7 @@ type Config struct {
 	DB            string        `env:"DATABASE_DSN"`
 }
 
+// Metric struct. Describes metric message format.
 type Metric struct {
 	ID    string   `json:"id"`              // имя метрики
 	MType string   `json:"type"`            // параметр, принимающий значение gauge или counter
@@ -47,6 +50,7 @@ type Metric struct {
 	Hash  string   `json:"hash,omitempty"`  // значение хеш-функции
 }
 
+// GetBody parses HTTP request's body and returns Metric.
 func GetBody(r *http.Request) (*Metric, error) {
 	body, err := io.ReadAll(r.Body)
 
@@ -61,6 +65,7 @@ func GetBody(r *http.Request) (*Metric, error) {
 	return m, nil
 }
 
+// Service structure. Holds application config and db connector.
 type Service struct {
 	cfg Config
 	db  *sql.DB
@@ -89,6 +94,7 @@ func (s Service) saveMetric(ctx context.Context, m *Metric) {
 	}
 }
 
+// RestoreMetricFromFile loads metrics from local file during application init.
 func (s Service) RestoreMetricFromFile() error {
 	flags := os.O_RDONLY | os.O_CREATE
 	consumer, err := NewConsumer(s.cfg.StoreFile, flags)
@@ -99,6 +105,7 @@ func (s Service) RestoreMetricFromFile() error {
 	return nil
 }
 
+// SaveMetricToFile saves metrics to local file.
 func (s *Service) SaveMetricToFile() {
 	var MetricList []Metric
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
@@ -116,6 +123,7 @@ func (s *Service) SaveMetricToFile() {
 	producer.Close()
 }
 
+// StartRecordInterval preiodically saves metrics.
 func (s Service) StartRecordInterval(ctx context.Context) {
 	ticker := time.NewTicker(s.cfg.StoreInterval)
 	for {
@@ -136,6 +144,7 @@ func (s Service) StartRecordInterval(ctx context.Context) {
 	}
 }
 
+// StartServer launches HTTP server.
 func (s Service) StartServer(ctx context.Context) {
 	r := chi.NewRouter()
 	r.Use(gzipHandle)
@@ -162,6 +171,7 @@ func (s Service) StartServer(ctx context.Context) {
 	log.Fatal(srv.ListenAndServe())
 }
 
+// GenerateHash generates sha256 hash for http request's body fields for message validation.
 func (s Service) GenerateHash(m *Metric) []byte {
 	var data string
 
@@ -176,11 +186,13 @@ func (s Service) GenerateHash(m *Metric) []byte {
 	return h.Sum(nil)
 }
 
+// CloseApp closes http application.
 func CloseApp() {
 	log.Println("SIGINT!")
 	os.Exit(1)
 }
 
+// RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
 func RewriteConfigWithEnvs(s *Service) {
 	if _, present := os.LookupEnv("ADDRESS"); !present {
 		s.cfg.Address = *address
