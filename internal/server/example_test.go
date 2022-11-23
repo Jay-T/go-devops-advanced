@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-func ExampleGetAllMetricHandler() {
+func ExampleService_GetAllMetricHandler() {
 	url := "http://localhost:8080/"
 
 	resp, err := http.Get(url)
@@ -94,7 +94,7 @@ func ExampleService_SetMetricOldHandler_second() {
 	defer resp.Body.Close()
 }
 
-func ExampleGetMetricOldHandler() {
+func ExampleService_GetMetricOldHandler() {
 	metricName := "PollCount"
 
 	url := fmt.Sprintf("http://localhost:8080/value/%s", metricName)

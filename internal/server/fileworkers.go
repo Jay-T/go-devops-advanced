@@ -54,7 +54,7 @@ func NewConsumer(filename string, flags int) (*consumer, error) {
 }
 
 // ReadEvents reads metrics from file, decodes them as MetricList.
-func (c *consumer) ReadEvents() error {
+func (c *consumer) ReadEvents(metrics map[string]Metric) error {
 	defer c.Close()
 	MetricList := []Metric{}
 	if err := c.decoder.Decode(&MetricList); err != nil {

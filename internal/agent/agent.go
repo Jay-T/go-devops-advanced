@@ -30,12 +30,7 @@ const (
 )
 
 var (
-	address        *string
-	reportInterval *time.Duration
-	pollInterval   *time.Duration
-	a              Agent
-	PollCount      int64
-	key            *string
+	PollCount int64
 )
 
 // metrics map stores all metrics in memory.
@@ -62,31 +57,45 @@ func (m Metric) GetValueFloat() float64 {
 
 // Config struct describes application config.
 type Config struct {
-	Address        string        `env:"ADDRESS" envDefault:"127.0.0.1:8080"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL" envDefault:"10s"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL" envDefault:"2s"`
+	Address        string        `env:"ADDRESS"`
+	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
+	PollInterval   time.Duration `env:"POLL_INTERVAL"`
 	Key            string        `env:"KEY"`
 }
 
-// Agent struct accepts Config and handles all metrics manipulations.
-type Agent struct {
-	Cfg Config
-}
+// RewriteConfigWithEnvs rewrites values from ENV variables if same variable is specified as flag.
+func GetConfig() (*Config, error) {
+	c := &Config{}
 
-// NewAgent configures Agent and returns pointer on it.
-func NewAgent() (*Agent, error) {
-	err := env.Parse(&a.Cfg)
+	flag.StringVar(&c.Address, "a", "localhost:8080", "Address for sending data to")
+	flag.DurationVar(&c.ReportInterval, "r", time.Duration(10*time.Second), "Metric report to server interval")
+	flag.DurationVar(&c.PollInterval, "p", time.Duration(2*time.Second), "Metric poll interval")
+	flag.StringVar(&c.Key, "k", "testkey", "Encryption key")
+	flag.Parse()
+
+	err := env.Parse(&c)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
 	}
 
-	address = flag.String("a", "localhost:8080", "Address for sending data to")
-	reportInterval = flag.Duration("r", time.Duration(10*time.Second), "Metric report to server interval")
-	pollInterval = flag.Duration("p", time.Duration(2*time.Second), "Metric poll interval")
-	key = flag.String("k", "testkey", "Encryption key")
-	flag.Parse()
-	RewriteConfigWithEnvs(&a)
+	return c, nil
+}
+
+// Agent struct accepts Config and handles all metrics manipulations.
+type Agent struct {
+	Cfg *Config
+}
+
+// NewAgent configures Agent and returns pointer on it.
+func NewAgent() (*Agent, error) {
+	var a Agent
+
+	cfg, err := GetConfig()
+	if err != nil {
+		log.Fatal("Error while getting config.", err.Error())
+	}
+	a.Cfg = cfg
 
 	return &a, nil
 }
@@ -169,7 +178,7 @@ func (a Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, sync
 			dataChan <- Data{name: "PollCount", counterValue: int64(PollCount)}
 
 		case <-ctx.Done():
-			fmt.Println("GetDataByInterval has been canceled successfully.")
+			log.Println("GetDataByInterval has been canceled successfully.")
 			return
 		}
 	}
@@ -186,7 +195,7 @@ func (a Agent) GetMemDataByInterval(ctx context.Context, gaugeChan chan<- Data, 
 			gaugeChan <- Data{name: "FreeMemory", gaugeValue: float64(v.Free)}
 
 		case <-ctx.Done():
-			fmt.Println("GetMemDataByInterval has been canceled successfully.")
+			log.Println("GetMemDataByInterval has been canceled successfully.")
 			return
 		}
 	}
@@ -207,7 +216,7 @@ func (a Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data) 
 			}
 
 		case <-ctx.Done():
-			fmt.Println("GetCPUDataByInterval has been canceled successfully.")
+			log.Println("GetCPUDataByInterval has been canceled successfully.")
 			return
 		}
 	}
@@ -256,10 +265,35 @@ func (a Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 				a.sendBulkData(&mList)
 			}
 		case <-ctx.Done():
-			fmt.Println("Context has been canceled successfully.")
+			log.Println("Context has been canceled successfully.")
 			return
 		}
 	}
+}
+
+// RunTicker function syncronizes goroutines that poll system metrics by sending signal to syncChan.
+// Goroutines that receive signal, poll system metrics with same interval.
+func (a Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
+	ticker := time.NewTicker(a.Cfg.PollInterval)
+	for {
+		select {
+		case t := <-ticker.C:
+			syncChan <- t
+		case <-ctx.Done():
+			log.Println("RunTicker has been canceled successfully.")
+		}
+	}
+}
+
+// StopAgent stops the application.
+func (a Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
+	<-sigChan
+	log.Println("Receieved a SIGINT! Stopping the agent.")
+
+	cancel()
+	log.Println("Stopped all goroutines.")
+
+	os.Exit(1)
 }
 
 // Data struct describes message format between goroutines
@@ -283,43 +317,7 @@ func NewMetric(ctx context.Context, dataChan <-chan Data) {
 			}
 			m.Unlock()
 		case <-ctx.Done():
-			fmt.Println("NewMetric has been canceled successfully.")
+			log.Println("NewMetric has been canceled successfully.")
 		}
-	}
-}
-
-// CloseApp stops the application.
-func CloseApp() {
-	log.Println("SIGINT!")
-	os.Exit(1)
-}
-
-// RunTicker function syncronizes goroutines that poll system metrics by sending signal to syncChan.
-// Goroutines that receive signal, poll system metrics with same interval.
-func RunTicker(ctx context.Context, syncChan chan<- time.Time) {
-	ticker := time.NewTicker(a.Cfg.PollInterval)
-	for {
-		select {
-		case t := <-ticker.C:
-			syncChan <- t
-		case <-ctx.Done():
-			fmt.Println("RunTicker has been canceled successfully.")
-		}
-	}
-}
-
-// RewriteConfigWithEnvs rewrites values from ENV variables if same variable is specified as flag.
-func RewriteConfigWithEnvs(a *Agent) {
-	if _, present := os.LookupEnv("ADDRESS"); !present {
-		a.Cfg.Address = *address
-	}
-	if _, present := os.LookupEnv("REPORT_INTERVAL"); !present {
-		a.Cfg.ReportInterval = *reportInterval
-	}
-	if _, present := os.LookupEnv("POLL_INTERVAL"); !present {
-		a.Cfg.PollInterval = *pollInterval
-	}
-	if _, present := os.LookupEnv("KEY"); !present {
-		a.Cfg.Key = *key
 	}
 }

@@ -53,13 +53,14 @@ func TestSetMetricHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				Cfg: Config{
+				Cfg: &Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
 					Restore:       true,
 					Key:           "testkey",
 				},
+				Metrics: map[string]Metric{},
 			}
 
 			mSer, _ := json.Marshal(tt.metric)
@@ -109,16 +110,17 @@ func TestGetMetricHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				Cfg: Config{
+				Cfg: &Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
 					Restore:       true,
 					Key:           "testkey",
 				},
+				Metrics: map[string]Metric{},
 			}
 
-			metrics["Alloc"] = tt.metric
+			s.Metrics["Alloc"] = tt.metric
 			mSer, _ := json.Marshal(tt.metric)
 			request := httptest.NewRequest(http.MethodPost, "/value/", bytes.NewBuffer(mSer))
 			w := httptest.NewRecorder()
@@ -154,13 +156,14 @@ func TestGenerateHash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				Cfg: Config{
+				Cfg: &Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
 					Restore:       true,
 					Key:           "testkey",
 				},
+				Metrics: map[string]Metric{},
 			}
 			res := s.GenerateHash(&tt.metric)
 
@@ -212,7 +215,8 @@ func TestSetMetricListHandler(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		DB: db,
+		DB:      db,
+		Metrics: map[string]Metric{},
 	}
 
 	tests := []struct {
@@ -281,7 +285,8 @@ func TestPingDBHandler(t *testing.T) {
 	defer db.Close()
 
 	s := Service{
-		DB: db,
+		DB:      db,
+		Metrics: map[string]Metric{},
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/", nil)

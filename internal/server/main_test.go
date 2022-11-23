@@ -57,12 +57,13 @@ func TestSetMetricOldHandler(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			s := Service{
-				Cfg: Config{
+				Cfg: &Config{
 					Address:       "localhost:8080",
 					StoreInterval: 10,
 					StoreFile:     "file.json",
 					Restore:       true,
 				},
+				Metrics: map[string]Metric{},
 			}
 			request := httptest.NewRequest(http.MethodPost, tt.requestURL, nil)
 			w := httptest.NewRecorder()
@@ -125,12 +126,13 @@ func TestGetBody(t *testing.T) {
 
 func BenchmarkSetMetricHandler(b *testing.B) {
 	s := Service{
-		Cfg: Config{
+		Cfg: &Config{
 			Address:       "localhost:8080",
 			StoreInterval: 10,
 			StoreFile:     "file.json",
 			Restore:       true,
 		},
+		Metrics: map[string]Metric{},
 	}
 	// triesN := 1
 
@@ -185,9 +187,19 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 }
 
 func BenchmarkGetAllMetricHandler(b *testing.B) {
+	s := Service{
+		Cfg: &Config{
+			Address:       "localhost:8080",
+			StoreInterval: 10,
+			StoreFile:     "file.json",
+			Restore:       true,
+		},
+		Metrics: map[string]Metric{},
+	}
+
 	w := httptest.NewRecorder()
 	requestGet := httptest.NewRequest(http.MethodGet, "/", nil)
-	h := http.HandlerFunc(GetAllMetricHandler)
+	h := http.HandlerFunc(s.GetAllMetricHandler)
 	b.Run("GetAllMetricHandler", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
 			h.ServeHTTP(w, requestGet)

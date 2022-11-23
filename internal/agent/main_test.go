@@ -8,16 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/caarlos0/env"
 	"github.com/stretchr/testify/require"
 )
-
-// type Config struct {
-// 	Address       string `env:"HOST" envDefault:"127.0.0.1:8080"`
-// 	StoreInterval int    `env:"STORE_INTERVAL" envDefault:"300"`
-// 	StoreFile     string `env:"STORE_FILE" envDefault:"tmp.json"`
-// 	Restore       bool   `env:"RESTORE" envDefault:"true"`
-// }
 
 func handlers() http.Handler {
 	r := http.NewServeMux()
@@ -56,9 +48,12 @@ func Test_SendData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := env.Parse(&a.Cfg)
-			if err != nil {
-				log.Fatal(err)
+			a := Agent{
+				Cfg: &Config{
+					Address:        "localhost:8080",
+					ReportInterval: 10,
+					PollInterval:   2,
+				},
 			}
 
 			m := Metric{
@@ -119,7 +114,7 @@ func Test_SendDataOld(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			a := Agent{
-				Cfg: Config{
+				Cfg: &Config{
 					Address:        "localhost:8080",
 					ReportInterval: 10,
 					PollInterval:   2,

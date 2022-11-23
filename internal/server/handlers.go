@@ -20,9 +20,11 @@ var htmlPage []byte
 
 // GetAllMetricHandler returns HTML page with all metrics values.
 // URI: /.
-func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
+func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 	var floatVal float64
-	for key, val := range metrics {
+	dataMap := map[string]float64{}
+
+	for key, val := range s.Metrics {
 		if val.MType == gauge {
 			floatVal = *val.Value
 		} else {
@@ -99,7 +101,7 @@ func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
-	data, found := metrics[m.ID]
+	data, found := s.Metrics[m.ID]
 	if !found {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return

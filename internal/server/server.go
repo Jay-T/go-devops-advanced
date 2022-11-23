@@ -26,29 +26,7 @@ const (
 	counter = "counter"
 )
 
-var metrics = make(map[string]Metric)
-var dataMap = make(map[string]float64)
-
-// vars for application configuration.
-var (
-	address       *string
-	restore       *bool
-	storeInterval *time.Duration
-	storeFile     *string
-	s             Service
-	key           *string
-	db            *string
-)
-
-// Config structure. Used for application configuration.
-type Config struct {
-	Address       string        `env:"ADDRESS" envDefault:"127.0.0.1:8080"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL" envDefault:"300s"`
-	StoreFile     string        `env:"STORE_FILE" envDefault:"/tmp/devops-metrics-db.json"`
-	Restore       bool          `env:"RESTORE" envDefault:"true"`
-	Key           string        `env:"KEY"`
-	DB            string        `env:"DATABASE_DSN"`
-}
+// var metrics = make(map[string]Metric)
 
 // Metric struct. Describes metric message format.
 type Metric struct {
@@ -74,41 +52,97 @@ func GetBody(r *http.Request) (*Metric, error) {
 	return m, nil
 }
 
-// Service structure. Holds application config and db connector.
-type Service struct {
-	Cfg Config
-	DB  *sql.DB
+// Config structure. Used for application configuration.
+type Config struct {
+	Address       string        `env:"ADDRESS"`
+	StoreInterval time.Duration `env:"STORE_INTERVAL"`
+	StoreFile     string        `env:"STORE_FILE"`
+	Restore       bool          `env:"RESTORE"`
+	Key           string        `env:"KEY"`
+	DBAddress     string        `env:"DATABASE_DSN"`
 }
 
-// NewService returns Service with config parsed from flags or ENV vars.
-func NewService() (*Service, error) {
-	err := env.Parse(&s.Cfg)
+// RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
+func GetConfig() (*Config, error) {
+	c := &Config{}
+
+	flag.StringVar(&c.Address, "a", "localhost:8080", "Socket to listen on")
+	flag.DurationVar(&c.StoreInterval, "i", time.Duration(300*time.Second), "Save data interval")
+	flag.StringVar(&c.StoreFile, "f", "/tmp/devops-metrics-db.json", "File for saving data")
+	flag.BoolVar(&c.Restore, "r", true, "Restore data from file")
+	flag.StringVar(&c.Key, "k", "", "Encryption key")
+	flag.StringVar(&c.DBAddress, "d", "", "Database address")
+
+	flag.Parse()
+
+	err := env.Parse(c)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
 	}
 
-	address = flag.String("a", "localhost:8080", "Socket to listen on")
-	restore = flag.Bool("r", true, "Restore data from file")
-	storeInterval = flag.Duration("i", time.Duration(300*time.Second), "Save data interval")
-	storeFile = flag.String("f", "/tmp/devops-metrics-db.json", "File for saving data")
-	key = flag.String("k", "", "Encryption key")
-	db = flag.String("d", "", "Database address")
-	flag.Parse()
-	RewriteConfigWithEnvs(&s)
+	return c, nil
+}
+
+// Service structure. Holds application config and db connector.
+type Service struct {
+	Cfg     *Config
+	DB      *sql.DB
+	Metrics map[string]Metric
+}
+
+// NewService returns Service with config parsed from flags or ENV vars.
+func NewService(ctx context.Context) (*Service, error) {
+	var s Service
+	s.Metrics = map[string]Metric{}
+
+	cfg, err := GetConfig()
+	if err != nil {
+		log.Fatal("Error while getting config.", err.Error())
+	}
+
+	s.Cfg = cfg
+	if s.Cfg.DBAddress != "" {
+		db, err := s.NewServiceDB(ctx)
+		if err != nil {
+			log.Print("Error during DB connection.")
+			log.Fatal(err)
+		}
+		s.DB = db
+	}
+
+	if s.Cfg.Restore {
+		if s.DB != nil {
+			log.Printf("Restoring metrics from DB")
+			if err := s.RestoreMetricFromDB(ctx); err != nil {
+				log.Println(err)
+			}
+		} else if s.Cfg.StoreFile != "" {
+			log.Printf("Restoring metrics from file '%s'", s.Cfg.StoreFile)
+			if err := s.RestoreMetricFromFile(); err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	if s.Cfg.StoreFile != "" && s.Cfg.StoreInterval > time.Duration(0) {
+		log.Printf("Saving results to file with interval %s", s.Cfg.StoreInterval)
+		go s.StartRecordInterval(ctx)
+	}
+
 	return &s, nil
 }
 
 func (s Service) saveMetric(ctx context.Context, m *Metric) {
 	switch m.MType {
 	case counter:
-		if metrics[m.ID].Delta == nil {
-			metrics[m.ID] = *m
+		if s.Metrics[m.ID].Delta == nil {
+			s.Metrics[m.ID] = *m
 		} else {
-			*metrics[m.ID].Delta += *m.Delta
+			*s.Metrics[m.ID].Delta += *m.Delta
 		}
 	case gauge:
-		metrics[m.ID] = *m
+		s.Metrics[m.ID] = *m
 	default:
 		log.Printf("Metric type '%s' is not expected. Skipping.", m.MType)
 	}
@@ -129,7 +163,7 @@ func (s Service) RestoreMetricFromFile() error {
 	if err != nil {
 		return err
 	}
-	consumer.ReadEvents()
+	consumer.ReadEvents(s.Metrics)
 	return nil
 }
 
@@ -142,7 +176,7 @@ func (s *Service) SaveMetricToFile() {
 		log.Fatal(err)
 	}
 
-	for _, metric := range metrics {
+	for _, metric := range s.Metrics {
 		MetricList = append(MetricList, metric)
 	}
 	if err := producer.WriteMetric(&MetricList); err != nil {
@@ -166,7 +200,7 @@ func (s Service) StartRecordInterval(ctx context.Context) {
 				s.SaveMetricToFile()
 			}
 		case <-ctx.Done():
-			fmt.Println("Context has been canceled successfully.")
+			log.Println("Context has been canceled successfully.")
 			return
 		}
 	}
@@ -182,8 +216,8 @@ func (s Service) StartServer(ctx context.Context) {
 	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
 	r.Post("/update/*", NotImplemented)
 	r.Post("/update/{metricName}/", NotFound)
-	r.Get("/value/*", GetMetricOldHandler)
-	r.Get("/", GetAllMetricHandler)
+	r.Get("/value/*", s.GetMetricOldHandler)
+	r.Get("/", s.GetAllMetricHandler)
 	// new methods
 	r.Post("/update/", s.SetMetricHandler(ctx))
 	r.Post("/updates/", s.SetMetricListHandler(ctx))
@@ -215,29 +249,24 @@ func (s Service) GenerateHash(m *Metric) []byte {
 }
 
 // CloseApp closes http application.
-func CloseApp() {
-	log.Println("SIGINT!")
-	os.Exit(1)
-}
+func (s Service) StopServer(ctx context.Context, cancel context.CancelFunc) {
+	log.Println("Received a SIGINT! Stopping application")
+	if s.DB != nil {
+		log.Println("Saving data to DB.")
+		err := s.SaveMetricToDB(ctx)
+		if err != nil {
+			log.Print(err.Error())
+		}
+		err = s.DB.Close()
+		if err != nil {
+			log.Print(err.Error())
+		}
+		log.Println("DB connection is closed.")
+	} else {
+		s.SaveMetricToFile()
+	}
 
-// RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
-func RewriteConfigWithEnvs(s *Service) {
-	if _, present := os.LookupEnv("ADDRESS"); !present {
-		s.Cfg.Address = *address
-	}
-	if _, present := os.LookupEnv("STORE_INTERVAL"); !present {
-		s.Cfg.StoreInterval = *storeInterval
-	}
-	if _, present := os.LookupEnv("STORE_FILE"); !present {
-		s.Cfg.StoreFile = *storeFile
-	}
-	if _, present := os.LookupEnv("RESTORE"); !present {
-		s.Cfg.Restore = *restore
-	}
-	if _, present := os.LookupEnv("KEY"); !present {
-		s.Cfg.Key = *key
-	}
-	if _, present := os.LookupEnv("DATABASE_DSN"); !present {
-		s.Cfg.DB = *db
-	}
+	cancel()
+	log.Println("Canceled all goroutines.")
+	os.Exit(1)
 }

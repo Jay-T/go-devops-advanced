@@ -9,55 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// type DBMock struct {
-// 	throwError bool
-// }
-
-// func (db DBMock) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
-// 	if db.throwError {
-// 		return nil, New("TestError")
-// 	}
-// 	return nil, nil
-// }
-
-// func (db DBMock) QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error) {
-// 	rows := &sql.Rows{}
-// 	return rows, nil
-// }
-
-// func (db DBMock) Begin() (*sql.Tx, error) {
-// 	return nil, nil
-// }
-
-// func (db DBMock) Close() error {
-// 	return nil
-// }
-// func (db DBMock) PingContext(ctx context.Context) error {
-// 	return nil
-// }
-
-// type DBRow struct{}
-
-// func (r DBRow) Close() error {
-// 	return nil
-// }
-
-// func (r DBRow) Columns() ([]string, error) {
-// 	return nil, nil
-// }
-
-// func (r DBRow) Err() error {
-// 	return nil
-// }
-
-// func (r DBRow) Next() bool {
-// 	return true
-// }
-
-// func (r DBRow) Scan(dest ...interface{}) error {
-// 	return nil
-// }
-
 type errorTest struct {
 	s string
 }
@@ -103,7 +54,8 @@ func TestRestoreMetricFromDB(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		DB: db,
+		DB:      db,
+		Metrics: map[string]Metric{},
 	}
 
 	rs := sqlmock.NewRows([]string{"id", "mtype", "delta", "value"}).AddRow("Alloc", "gauge", "0", "23456")
@@ -113,7 +65,7 @@ func TestRestoreMetricFromDB(t *testing.T) {
 		WillReturnRows(rs)
 
 	s.RestoreMetricFromDB(ctx)
-	assert.Equal(t, metrics["Alloc"], Metric{
+	assert.Equal(t, s.Metrics["Alloc"], Metric{
 		ID:    "Alloc",
 		MType: gauge,
 		Delta: getIntPointer(0),
@@ -130,10 +82,11 @@ func TestSaveMetricToDB(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		DB: db,
+		DB:      db,
+		Metrics: map[string]Metric{},
 	}
 
-	metrics = map[string]Metric{
+	s.Metrics = map[string]Metric{
 		"Alloc": {
 			ID:    "Alloc",
 			MType: gauge,
@@ -142,7 +95,7 @@ func TestSaveMetricToDB(t *testing.T) {
 		},
 	}
 
-	metric := metrics["Alloc"]
+	metric := s.Metrics["Alloc"]
 	mock.ExpectBegin()
 	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().
 		WithArgs(metric.ID, metric.MType, metric.Delta, metric.Value).
@@ -167,7 +120,8 @@ func TestSaveListToDB(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		DB: db,
+		DB:      db,
+		Metrics: map[string]Metric{},
 	}
 	mList := []Metric{
 		{

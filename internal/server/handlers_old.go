@@ -48,11 +48,11 @@ func (s Service) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 	})
 }
 
-func GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
+func (s Service) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
 	var returnValue float64
 	splitURL := strings.Split(r.URL.Path, "/")
 	metricName := splitURL[3]
-	val, found := metrics[metricName]
+	val, found := s.Metrics[metricName]
 	if !found {
 		http.Error(w, "There is no metric you requested", http.StatusNotFound)
 		return

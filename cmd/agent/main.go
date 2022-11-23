@@ -26,13 +26,11 @@ func main() {
 	syncChan := make(chan time.Time)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go agent.RunTicker(ctx, syncChan)
+	go a.RunTicker(ctx, syncChan)
 	go agent.NewMetric(ctx, dataChan)
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
 	go a.SendDataByInterval(ctx, dataChan)
-	<-sigChan
-	cancel()
-	agent.CloseApp()
+	a.StopAgent(sigChan, cancel)
 }
