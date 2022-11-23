@@ -34,7 +34,6 @@ var (
 )
 
 // metrics map stores all metrics in memory.
-var metrics = make(map[string]Metric)
 
 // Metric struct describes format of metric messages.
 type Metric struct {
@@ -82,9 +81,18 @@ func GetConfig() (*Config, error) {
 	return c, nil
 }
 
+// Data struct describes message format between goroutines
+type Data struct {
+	name         string
+	gaugeValue   float64
+	counterValue int64
+}
+
 // Agent struct accepts Config and handles all metrics manipulations.
 type Agent struct {
-	Cfg *Config
+	Cfg     *Config
+	Metrics map[string]Metric
+	l       sync.Mutex
 }
 
 // NewAgent configures Agent and returns pointer on it.
@@ -95,13 +103,14 @@ func NewAgent() (*Agent, error) {
 	if err != nil {
 		log.Fatal("Error while getting config.", err.Error())
 	}
+	a.Metrics = map[string]Metric{}
 	a.Cfg = cfg
 
 	return &a, nil
 }
 
 // AddHash computes hash for Metric fields for validation before sending it to server.
-func (a Agent) AddHash(m *Metric) {
+func (a *Agent) AddHash(m *Metric) {
 	var data string
 
 	h := hmac.New(sha256.New, []byte(a.Cfg.Key))
@@ -115,7 +124,7 @@ func (a Agent) AddHash(m *Metric) {
 	m.Hash = hex.EncodeToString(h.Sum(nil))
 }
 
-func (a Agent) sendData(m *Metric) error {
+func (a *Agent) sendData(m *Metric) error {
 	var url string
 	if a.Cfg.Key != "" {
 		a.AddHash(m)
@@ -138,7 +147,7 @@ func (a Agent) sendData(m *Metric) error {
 }
 
 // GetDataByInterval gouroutine polls memory metrics each time it receives signal from syncChan.
-func (a Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, syncChan <-chan time.Time) {
+func (a *Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, syncChan <-chan time.Time) {
 	var rtm runtime.MemStats
 
 	for {
@@ -186,7 +195,7 @@ func (a Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, sync
 
 // GetMemDataByInterval gouroutine polls CPU data from system.
 // Polls CPU metrics each time it receives signal from syncChan.
-func (a Agent) GetMemDataByInterval(ctx context.Context, gaugeChan chan<- Data, syncChan <-chan time.Time) {
+func (a *Agent) GetMemDataByInterval(ctx context.Context, gaugeChan chan<- Data, syncChan <-chan time.Time) {
 	for {
 		select {
 		case <-syncChan:
@@ -203,7 +212,7 @@ func (a Agent) GetMemDataByInterval(ctx context.Context, gaugeChan chan<- Data, 
 
 // GetCPUDataByInterval gouroutine polls MEM data from system.
 // Polls MEM metrics each time it receives signal from syncChan.
-func (a Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data) {
+func (a *Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data) {
 	const CPUPollTime time.Duration = 10 * time.Second
 
 	for {
@@ -222,7 +231,7 @@ func (a Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data) 
 	}
 }
 
-func (a Agent) sendBulkData(mList *[]Metric) error {
+func (a *Agent) sendBulkData(mList *[]Metric) error {
 	var url string
 
 	mSer, err := json.Marshal(*mList)
@@ -242,12 +251,13 @@ func (a Agent) sendBulkData(mList *[]Metric) error {
 }
 
 // SendDataByInterval gorouting sends data to server every specified interval.
-func (a Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
+func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	ticker := time.NewTicker(a.Cfg.ReportInterval)
 	for {
 		select {
 		case <-ticker.C:
-			metricsSnapshot := metrics
+			a.l.Lock()
+			metricsSnapshot := a.Metrics
 			var mList []Metric
 
 			for _, m := range metricsSnapshot {
@@ -261,6 +271,7 @@ func (a Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 					dataChan <- Data{name: "PollCount", counterValue: 0}
 				}
 			}
+			a.l.Unlock()
 			if len(mList) > 0 {
 				a.sendBulkData(&mList)
 			}
@@ -273,7 +284,7 @@ func (a Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 
 // RunTicker function syncronizes goroutines that poll system metrics by sending signal to syncChan.
 // Goroutines that receive signal, poll system metrics with same interval.
-func (a Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
+func (a *Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 	ticker := time.NewTicker(a.Cfg.PollInterval)
 	for {
 		select {
@@ -286,7 +297,7 @@ func (a Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 }
 
 // StopAgent stops the application.
-func (a Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
+func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
 	<-sigChan
 	log.Println("Receieved a SIGINT! Stopping the agent.")
 
@@ -296,24 +307,17 @@ func (a Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
 	os.Exit(1)
 }
 
-// Data struct describes message format between goroutines
-type Data struct {
-	name         string
-	gaugeValue   float64
-	counterValue int64
-}
-
 // NewMetric saves new incoming Data from channel to metric map in Metric format.
-func NewMetric(ctx context.Context, dataChan <-chan Data) {
+func (a *Agent) NewMetric(ctx context.Context, dataChan <-chan Data) {
 	var m sync.Mutex
 	for {
 		select {
 		case data := <-dataChan:
 			m.Lock()
 			if data.name == "PollCount" {
-				metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
+				a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
 			} else {
-				metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
+				a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
 			}
 			m.Unlock()
 		case <-ctx.Done():

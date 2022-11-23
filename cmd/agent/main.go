@@ -27,7 +27,7 @@ func main() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go a.RunTicker(ctx, syncChan)
-	go agent.NewMetric(ctx, dataChan)
+	go a.NewMetric(ctx, dataChan)
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
