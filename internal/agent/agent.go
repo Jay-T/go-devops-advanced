@@ -73,7 +73,7 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&c.Key, "k", "testkey", "Encryption key")
 	flag.Parse()
 
-	err := env.Parse(&c)
+	err := env.Parse(c)
 	if err != nil {
 		log.Fatal(err)
 		return nil, err
