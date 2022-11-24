@@ -51,6 +51,10 @@ func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackup
 func (s Service) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
 	var returnValue float64
 	splitURL := strings.Split(r.URL.Path, "/")
+	if len(splitURL) < 4 {
+		http.Error(w, "There is no metric you requested", http.StatusNotFound)
+		return
+	}
 	metricName := splitURL[3]
 	val, found := s.Metrics[metricName]
 	if !found {

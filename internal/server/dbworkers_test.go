@@ -106,6 +106,7 @@ func TestSaveMetricToDB(t *testing.T) {
 	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().
 		WithArgs(metric.ID, metric.MType, metric.Delta, metric.Value).
 		WillReturnResult(sqlmock.NewResult(1, 1))
+	mock.ExpectCommit()
 	err = dbs.SaveMetric(ctx, s.Metrics)
 	assert.NoError(t, err)
 
@@ -113,6 +114,7 @@ func TestSaveMetricToDB(t *testing.T) {
 	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().
 		WithArgs(metric.ID, metric.MType, metric.Delta, metric.Value).
 		WillReturnError(New("TestError"))
+	mock.ExpectRollback()
 	err = dbs.SaveMetric(ctx, s.Metrics)
 	assert.Error(t, err)
 }
