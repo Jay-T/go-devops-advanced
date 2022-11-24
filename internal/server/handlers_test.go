@@ -69,7 +69,10 @@ func TestSetMetricHandler(t *testing.T) {
 
 			ctx := context.TODO()
 
-			h := http.HandlerFunc(s.SetMetricHandler(ctx))
+			fs := &FileStorageBackuper{
+				filename: "test",
+			}
+			h := http.HandlerFunc(s.SetMetricHandler(ctx, fs))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -215,8 +218,11 @@ func TestSetMetricListHandler(t *testing.T) {
 	ctx := context.TODO()
 
 	s := Service{
-		DB:      db,
 		Metrics: map[string]Metric{},
+	}
+
+	dbs := &DBStorageBackuper{
+		db: db,
 	}
 
 	tests := []struct {
@@ -266,7 +272,7 @@ func TestSetMetricListHandler(t *testing.T) {
 			mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectCommit()
 
-			h := http.HandlerFunc(s.SetMetricListHandler(ctx))
+			h := http.HandlerFunc(s.SetMetricListHandler(ctx, dbs))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -277,23 +283,22 @@ func TestSetMetricListHandler(t *testing.T) {
 	}
 }
 
-func TestPingDBHandler(t *testing.T) {
+func TestCheckStorageStatus(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
 	defer db.Close()
 
-	s := Service{
-		DB:      db,
-		Metrics: map[string]Metric{},
+	dbs := &DBStorageBackuper{
+		db: db,
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/", nil)
 
 	mock.ExpectPing()
 	w := httptest.NewRecorder()
-	h := http.HandlerFunc(s.PingDBHandler)
+	h := http.HandlerFunc(dbs.CheckStorageStatus)
 
 	h.ServeHTTP(w, request)
 	res := w.Result()
@@ -302,7 +307,7 @@ func TestPingDBHandler(t *testing.T) {
 
 	mock.ExpectPing().WillReturnError(New("TestError"))
 	w = httptest.NewRecorder()
-	h = http.HandlerFunc(s.PingDBHandler)
+	h = http.HandlerFunc(dbs.CheckStorageStatus)
 
 	h.ServeHTTP(w, request)
 	res = w.Result()

@@ -17,9 +17,9 @@ func (s *Service) saveListToDB(ctx context.Context, mList *[]Metric, backuper St
 		case gauge:
 			s.Metrics[m.ID] = m
 		}
-		if err := backuper.SaveMetric(ctx, s.Metrics); err != nil {
-			return err
-		}
+	}
+	if err := backuper.SaveMetric(ctx, s.Metrics); err != nil {
+		return err
 	}
 	return nil
 }

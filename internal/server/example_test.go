@@ -106,7 +106,7 @@ func ExampleService_GetMetricOldHandler() {
 	defer resp.Body.Close()
 }
 
-func ExampleService_PingDBHandler() {
+func ExampleDBStorageBackuper_CheckStorageStatus() {
 	url := "http://localhost:8080/ping"
 
 	resp, err := http.Get(url)

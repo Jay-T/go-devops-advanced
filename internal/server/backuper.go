@@ -43,7 +43,10 @@ func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[st
 			return err
 		}
 	}
-	tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
