@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func (s Service) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
+func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var m Metric
 
@@ -44,7 +44,7 @@ func (s Service) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 			log.Printf("Metric type '%s' is not expected. Skipping.", mType)
 		}
 		w.WriteHeader(http.StatusOK)
-		s.saveMetric(ctx, &m)
+		s.saveMetric(ctx, backuper, &m)
 	})
 }
 

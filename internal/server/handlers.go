@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
-	"time"
 )
 
 //go:embed metrics.html
@@ -40,7 +39,7 @@ func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 
 // SetMetricHandler saves metric from HTTP POST request.
 // URI: /update/.
-func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
+func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := GetBody(r)
 
@@ -61,7 +60,7 @@ func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveMetric(ctx, m)
+		s.saveMetric(ctx, backuper, m)
 		w.WriteHeader(http.StatusOK)
 		r.Body.Close()
 	})
@@ -69,12 +68,12 @@ func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 
 // SetMetricListHandler saves a list of metrics from HTTP POST request.
 // URI: "/updates/".
-func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
+func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.DB == nil {
-			http.Error(w, "You haven`t opened the database connection", http.StatusInternalServerError)
-			return
-		}
+		// if s.DB == nil {
+		// 	http.Error(w, "You haven`t opened the database connection", http.StatusInternalServerError)
+		// 	return
+		// }
 		body, err := io.ReadAll(r.Body)
 
 		if err != nil {
@@ -86,7 +85,7 @@ func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveListToDB(ctx, m)
+		s.saveListToDB(ctx, m, backuper)
 		r.Body.Close()
 	})
 }
@@ -155,17 +154,4 @@ func gzipHandle(next http.Handler) http.Handler {
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
 	})
-}
-
-// PingDBHandler checks DB connection.
-// URI: /ping.
-func (s Service) PingDBHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	if err := s.DB.PingContext(ctx); err != nil {
-		log.Println(err)
-		http.Error(w, "Error in DB connection.", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
 }

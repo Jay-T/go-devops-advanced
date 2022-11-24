@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -25,8 +24,6 @@ const (
 	gauge   = "gauge"
 	counter = "counter"
 )
-
-// var metrics = make(map[string]Metric)
 
 // Metric struct. Describes metric message format.
 type Metric struct {
@@ -87,53 +84,32 @@ func GetConfig() (*Config, error) {
 // Service structure. Holds application config and db connector.
 type Service struct {
 	Cfg     *Config
-	DB      *sql.DB
 	Metrics map[string]Metric
 }
 
 // NewService returns Service with config parsed from flags or ENV vars.
-func NewService(ctx context.Context) (*Service, error) {
+func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Service, error) {
 	var s Service
 	s.Metrics = map[string]Metric{}
-
-	cfg, err := GetConfig()
-	if err != nil {
-		log.Fatal("Error while getting config.", err.Error())
-	}
-
 	s.Cfg = cfg
-	if s.Cfg.DBAddress != "" {
-		db, err := s.NewServiceDB(ctx)
-		if err != nil {
-			log.Print("Error during DB connection.")
-			log.Fatal(err)
-		}
-		s.DB = db
-	}
 
 	if s.Cfg.Restore {
-		if s.DB != nil {
-			log.Printf("Restoring metrics from DB")
-			if err := s.RestoreMetricFromDB(ctx); err != nil {
-				log.Println(err)
-			}
-		} else if s.Cfg.StoreFile != "" {
-			log.Printf("Restoring metrics from file '%s'", s.Cfg.StoreFile)
-			if err := s.RestoreMetricFromFile(); err != nil {
-				log.Println(err)
-			}
+		err := backuper.RestoreMetrics(ctx, s.Metrics)
+		if err != nil {
+			log.Print("Error during data restoration.")
+			return nil, err
 		}
 	}
 
 	if s.Cfg.StoreFile != "" && s.Cfg.StoreInterval > time.Duration(0) {
 		log.Printf("Saving results to file with interval %s", s.Cfg.StoreInterval)
-		go s.StartRecordInterval(ctx)
+		go s.StartRecordInterval(ctx, backuper)
 	}
 
 	return &s, nil
 }
 
-func (s Service) saveMetric(ctx context.Context, m *Metric) {
+func (s Service) saveMetric(ctx context.Context, backuper StorageBackuper, m *Metric) {
 	switch m.MType {
 	case counter:
 		if s.Metrics[m.ID].Delta == nil {
@@ -146,58 +122,18 @@ func (s Service) saveMetric(ctx context.Context, m *Metric) {
 	default:
 		log.Printf("Metric type '%s' is not expected. Skipping.", m.MType)
 	}
-	if s.DB != nil {
-		err := s.SaveMetricToDB(ctx)
-		if err != nil {
-			log.Print(err.Error())
-		}
-	} else if s.Cfg.StoreFile != "" && s.Cfg.StoreInterval == time.Duration(0) {
-		s.SaveMetricToFile()
-	}
-}
-
-// RestoreMetricFromFile loads metrics from local file during application init.
-func (s Service) RestoreMetricFromFile() error {
-	flags := os.O_RDONLY | os.O_CREATE
-	consumer, err := NewConsumer(s.Cfg.StoreFile, flags)
-	if err != nil {
-		return err
-	}
-	consumer.ReadEvents(s.Metrics)
-	return nil
-}
-
-// SaveMetricToFile saves metrics to local file.
-func (s *Service) SaveMetricToFile() {
-	var MetricList []Metric
-	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-	producer, err := NewProducer(s.Cfg.StoreFile, flags)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, metric := range s.Metrics {
-		MetricList = append(MetricList, metric)
-	}
-	if err := producer.WriteMetric(&MetricList); err != nil {
-		log.Fatal(err)
-	}
-	producer.Close()
+	backuper.SaveMetric(ctx, s.Metrics)
 }
 
 // StartRecordInterval preiodically saves metrics.
-func (s Service) StartRecordInterval(ctx context.Context) {
+func (s Service) StartRecordInterval(ctx context.Context, backuper StorageBackuper) {
 	ticker := time.NewTicker(s.Cfg.StoreInterval)
 	for {
 		select {
 		case <-ticker.C:
-			if s.DB != nil {
-				err := s.SaveMetricToDB(ctx)
-				if err != nil {
-					log.Print(err.Error())
-				}
-			} else {
-				s.SaveMetricToFile()
+			err := backuper.SaveMetric(ctx, s.Metrics)
+			if err != nil {
+				log.Print(err.Error())
 			}
 		case <-ctx.Done():
 			log.Println("Context has been canceled successfully.")
@@ -207,22 +143,22 @@ func (s Service) StartRecordInterval(ctx context.Context) {
 }
 
 // StartServer launches HTTP server.
-func (s Service) StartServer(ctx context.Context) {
+func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 	r := chi.NewRouter()
 	r.Use(gzipHandle)
 	r.Mount("/debug", middleware.Profiler())
 	// old methods
-	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
-	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
+	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
+	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
 	r.Post("/update/*", NotImplemented)
 	r.Post("/update/{metricName}/", NotFound)
 	r.Get("/value/*", s.GetMetricOldHandler)
 	r.Get("/", s.GetAllMetricHandler)
 	// new methods
-	r.Post("/update/", s.SetMetricHandler(ctx))
-	r.Post("/updates/", s.SetMetricListHandler(ctx))
+	r.Post("/update/", s.SetMetricHandler(ctx, backuper))
+	r.Post("/updates/", s.SetMetricListHandler(ctx, backuper))
 	r.Post("/value/", s.GetMetricHandler)
-	r.Get("/ping", s.PingDBHandler)
+	r.Get("/ping", backuper.CheckStorageStatus)
 
 	srv := &http.Server{
 		Addr:    s.Cfg.Address,
@@ -249,23 +185,9 @@ func (s Service) GenerateHash(m *Metric) []byte {
 }
 
 // CloseApp closes http application.
-func (s Service) StopServer(ctx context.Context, cancel context.CancelFunc) {
+func (s Service) StopServer(ctx context.Context, cancel context.CancelFunc, backuper StorageBackuper) {
 	log.Println("Received a SIGINT! Stopping application")
-	if s.DB != nil {
-		log.Println("Saving data to DB.")
-		err := s.SaveMetricToDB(ctx)
-		if err != nil {
-			log.Print(err.Error())
-		}
-		err = s.DB.Close()
-		if err != nil {
-			log.Print(err.Error())
-		}
-		log.Println("DB connection is closed.")
-	} else {
-		s.SaveMetricToFile()
-	}
-
+	backuper.SaveMetric(ctx, s.Metrics)
 	cancel()
 	log.Println("Canceled all goroutines.")
 	os.Exit(1)
