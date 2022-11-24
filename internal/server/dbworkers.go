@@ -5,7 +5,7 @@ import (
 	"database/sql"
 )
 
-func (s *Service) saveListToDB(ctx context.Context, mList *[]Metric, backuper StorageBackuper) error {
+func (s *Service) saveListToDB(ctx context.Context, mList *[43]Metric, backuper StorageBackuper) error {
 	for _, m := range *mList {
 		switch m.MType {
 		case counter:

@@ -70,16 +70,12 @@ func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper)
 // URI: "/updates/".
 func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// if s.DB == nil {
-		// 	http.Error(w, "You haven`t opened the database connection", http.StatusInternalServerError)
-		// 	return
-		// }
 		body, err := io.ReadAll(r.Body)
 
 		if err != nil {
 			log.Println(err)
 		}
-		m := &[]Metric{}
+		m := &[43]Metric{}
 		err = json.Unmarshal(body, m)
 		if err != nil {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
