@@ -131,7 +131,7 @@ func TestSaveListToDB(t *testing.T) {
 		db: db,
 	}
 
-	mList := []Metric{
+	mList := [43]Metric{
 		{
 			ID:    "Alloc",
 			MType: gauge,
