@@ -75,13 +75,13 @@ func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBacku
 		if err != nil {
 			log.Println(err)
 		}
-		m := &[43]Metric{}
-		err = json.Unmarshal(body, m)
+		m := make([]Metric, 0, 43)
+		err = json.Unmarshal(body, &m)
 		if err != nil {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveListToDB(ctx, m, backuper)
+		s.saveListToDB(ctx, &m, backuper)
 		r.Body.Close()
 	})
 }

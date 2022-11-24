@@ -70,7 +70,7 @@ func TestSetMetricHandler(t *testing.T) {
 			ctx := context.TODO()
 
 			fs := &FileStorageBackuper{
-				filename: "test",
+				filename: "/tmp/test",
 			}
 			h := http.HandlerFunc(s.SetMetricHandler(ctx, fs))
 
