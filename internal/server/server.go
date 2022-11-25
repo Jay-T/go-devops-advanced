@@ -62,7 +62,7 @@ type Config struct {
 // RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
 func GetConfig() (*Config, error) {
 	c := &Config{}
-
+	fmt.Println("taking config.")
 	flag.StringVar(&c.Address, "a", "localhost:8080", "Socket to listen on")
 	flag.DurationVar(&c.StoreInterval, "i", time.Duration(300*time.Second), "Save data interval")
 	flag.StringVar(&c.StoreFile, "f", "/tmp/devops-metrics-db.json", "File for saving data")
