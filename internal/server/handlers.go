@@ -18,7 +18,7 @@ import (
 var htmlPage []byte
 
 // GetAllMetricHandler returns HTML page with all metrics values.
-// URI: /.
+// URI: "/".
 func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 	var floatVal float64
 	dataMap := map[string]float64{}
@@ -38,7 +38,7 @@ func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // SetMetricHandler saves metric from HTTP POST request.
-// URI: /update/.
+// URI: "/update/".
 func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := GetBody(r)

@@ -33,8 +33,6 @@ var (
 	PollCount int64
 )
 
-// metrics map stores all metrics in memory.
-
 // Metric struct describes format of metric messages.
 type Metric struct {
 	ID    string   `json:"id"`              // metric's name

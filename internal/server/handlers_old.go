@@ -9,6 +9,11 @@ import (
 	"strings"
 )
 
+// SetMetricOldHandler - an old handler that receives metrics in URI.
+// URI: "/update/gauge/{metricName}/{metricValue}".
+// URI: "/update/gcounter/{metricName}/{metricValue}".
+//
+// Deprecated: use SetMetricHandler instead.
 func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var m Metric
@@ -48,6 +53,10 @@ func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackup
 	})
 }
 
+// GetMetricOldHandler - an old handler that returns a plain text metric value.
+// URI: "/value/".
+//
+// Deprecated: use GetMetricHandler instead.
 func (s Service) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
 	var returnValue float64
 	splitURL := strings.Split(r.URL.Path, "/")
