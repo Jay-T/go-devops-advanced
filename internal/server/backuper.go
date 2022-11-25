@@ -171,6 +171,5 @@ func NewBackuper(ctx context.Context, cfg *Config) (StorageBackuper, error) {
 		}
 		backuper = fileBackuper
 	}
-	log.Print("Successfully got a backuper.")
 	return backuper, nil
 }
