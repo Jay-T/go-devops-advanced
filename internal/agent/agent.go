@@ -92,7 +92,7 @@ type Data struct {
 type Agent struct {
 	Cfg     *Config
 	Metrics map[string]Metric
-	l       sync.Mutex
+	l       sync.RWMutex
 }
 
 // NewAgent configures Agent and returns pointer on it.
@@ -256,11 +256,8 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	for {
 		select {
 		case <-ticker.C:
-			a.l.Lock()
-			metricsSnapshot := a.Metrics
 			var mList []Metric
-
-			for _, m := range metricsSnapshot {
+			for _, m := range a.Metrics {
 				err := a.sendData(&m)
 				if err != nil {
 					log.Printf("metric: %s, error: %s", m.ID, err)
@@ -271,7 +268,6 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 					dataChan <- Data{name: "PollCount", counterValue: 0}
 				}
 			}
-			a.l.Unlock()
 			if len(mList) > 0 {
 				a.sendBulkData(&mList)
 			}
@@ -309,17 +305,16 @@ func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
 
 // NewMetric saves new incoming Data from channel to metric map in Metric format.
 func (a *Agent) NewMetric(ctx context.Context, dataChan <-chan Data) {
-	var m sync.Mutex
 	for {
 		select {
 		case data := <-dataChan:
-			m.Lock()
+			a.l.Lock()
 			if data.name == "PollCount" {
 				a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
 			} else {
 				a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
 			}
-			m.Unlock()
+			a.l.Unlock()
 		case <-ctx.Done():
 			log.Println("NewMetric has been canceled successfully.")
 		}
