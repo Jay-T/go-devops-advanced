@@ -22,7 +22,7 @@ func main() {
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
-	dataChan := make(chan agent.Data)
+	dataChan := make(chan agent.Data, 50)
 	syncChan := make(chan time.Time)
 
 	ctx, cancel := context.WithCancel(context.Background())

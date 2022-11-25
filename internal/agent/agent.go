@@ -257,6 +257,7 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 		select {
 		case <-ticker.C:
 			var mList []Metric
+			a.l.Lock()
 			for _, m := range a.Metrics {
 				err := a.sendData(&m)
 				if err != nil {
@@ -268,6 +269,7 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 					dataChan <- Data{name: "PollCount", counterValue: 0}
 				}
 			}
+			a.l.Unlock()
 			if len(mList) > 0 {
 				a.sendBulkData(&mList)
 			}
