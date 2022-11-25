@@ -106,6 +106,7 @@ func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Se
 		go s.StartRecordInterval(ctx, backuper)
 	}
 
+	log.Print("Successfully got a service.")
 	return &s, nil
 }
 
@@ -165,6 +166,7 @@ func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 		Handler: r,
 	}
 	srv.SetKeepAlivesEnabled(false)
+	log.Print("Launching a server.")
 	log.Printf("Listening socket: %s", s.Cfg.Address)
 	log.Fatal(srv.ListenAndServe())
 }
