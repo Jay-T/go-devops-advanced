@@ -62,7 +62,7 @@ type Config struct {
 // RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
 func GetConfig() (*Config, error) {
 	c := &Config{}
-	fmt.Println("taking config.")
+	// fmt.Println("taking config.")
 	flag.StringVar(&c.Address, "a", "localhost:8080", "Socket to listen on")
 	flag.DurationVar(&c.StoreInterval, "i", time.Duration(300*time.Second), "Save data interval")
 	flag.StringVar(&c.StoreFile, "f", "/tmp/devops-metrics-db.json", "File for saving data")
@@ -106,7 +106,7 @@ func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Se
 		go s.StartRecordInterval(ctx, backuper)
 	}
 
-	log.Print("Successfully got a service.")
+	// log.Print("Successfully got a service.")
 	return &s, nil
 }
 
@@ -166,7 +166,7 @@ func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 		Handler: r,
 	}
 	srv.SetKeepAlivesEnabled(false)
-	log.Print("Launching a server.")
+	// log.Print("Launching a server.")
 	log.Printf("Listening socket: %s", s.Cfg.Address)
 	log.Fatal(srv.ListenAndServe())
 }
