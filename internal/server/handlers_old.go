@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -9,7 +9,12 @@ import (
 	"strings"
 )
 
-func (s Service) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
+// SetMetricOldHandler - an old handler that receives metrics in URI.
+// URI: "/update/gauge/{metricName}/{metricValue}".
+// URI: "/update/gcounter/{metricName}/{metricValue}".
+//
+// Deprecated: use SetMetricHandler instead.
+func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var m Metric
 
@@ -44,15 +49,23 @@ func (s Service) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 			log.Printf("Metric type '%s' is not expected. Skipping.", mType)
 		}
 		w.WriteHeader(http.StatusOK)
-		s.saveMetric(ctx, &m)
+		s.saveMetric(ctx, backuper, &m)
 	})
 }
 
-func GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
+// GetMetricOldHandler - an old handler that returns a plain text metric value.
+// URI: "/value/".
+//
+// Deprecated: use GetMetricHandler instead.
+func (s Service) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
 	var returnValue float64
 	splitURL := strings.Split(r.URL.Path, "/")
+	if len(splitURL) < 4 {
+		http.Error(w, "There is no metric you requested", http.StatusNotFound)
+		return
+	}
 	metricName := splitURL[3]
-	val, found := metrics[metricName]
+	val, found := s.Metrics[metricName]
 	if !found {
 		http.Error(w, "There is no metric you requested", http.StatusNotFound)
 		return

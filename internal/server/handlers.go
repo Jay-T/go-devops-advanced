@@ -1,23 +1,29 @@
-package main
+package server
 
 import (
 	"compress/gzip"
 	"context"
 	"crypto/hmac"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
-	"os"
 	"strings"
 	"text/template"
-	"time"
 )
 
-func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
+//go:embed metrics.html
+var htmlPage []byte
+
+// GetAllMetricHandler returns HTML page with all metrics values.
+// URI: "/".
+func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 	var floatVal float64
-	for key, val := range metrics {
+	dataMap := map[string]float64{}
+
+	for key, val := range s.Metrics {
 		if val.MType == gauge {
 			floatVal = *val.Value
 		} else {
@@ -26,21 +32,18 @@ func GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 		dataMap[key] = floatVal
 	}
 
-	htmlPage, err := os.ReadFile("cmd/server/metrics.html") // TODO: Fix file path relation
-	if err != nil {
-		log.Println(err)
-		os.Exit(1)
-	}
 	w.Header().Set("Content-Type", "text/html")
 	tmpl := template.Must(template.New("").Parse(string(htmlPage)))
 	tmpl.Execute(w, dataMap)
 }
 
-func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
+// SetMetricHandler saves metric from HTTP POST request.
+// URI: "/update/".
+func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := GetBody(r)
 
-		if s.cfg.Key != "" {
+		if s.Cfg.Key != "" {
 			localHash := s.GenerateHash(m)
 			remoteHash, err := hex.DecodeString(m.Hash)
 			if err != nil {
@@ -57,34 +60,34 @@ func (s Service) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveMetric(ctx, m)
+		s.saveMetric(ctx, backuper, m)
 		w.WriteHeader(http.StatusOK)
 		r.Body.Close()
 	})
 }
 
-func (s Service) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
+// SetMetricListHandler saves a list of metrics from HTTP POST request.
+// URI: "/updates/".
+func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.db == nil {
-			http.Error(w, "You haven`t opened the database connection", http.StatusInternalServerError)
-			return
-		}
 		body, err := io.ReadAll(r.Body)
 
 		if err != nil {
 			log.Println(err)
 		}
-		m := &[]Metric{}
-		err = json.Unmarshal(body, m)
+		m := make([]Metric, 0, 43)
+		err = json.Unmarshal(body, &m)
 		if err != nil {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveListToDB(ctx, m)
+		s.saveListToDB(ctx, &m, backuper)
 		r.Body.Close()
 	})
 }
 
+// GetMetricHandler returns a metric which was specified in HTTP POST request.
+// URI: "/value/".
 func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	m, err := GetBody(r)
 	r.Body.Close()
@@ -93,13 +96,13 @@ func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Add("Content-Type", "application/json")
-	data, found := metrics[m.ID]
+	data, found := s.Metrics[m.ID]
 	if !found {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
 
-	if s.cfg.Key != "" {
+	if s.Cfg.Key != "" {
 		data.Hash = hex.EncodeToString(s.GenerateHash(&data))
 	}
 
@@ -111,10 +114,12 @@ func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(res)
 }
 
+// NotImplemented handler returns HTTP StatusNotImplemented (code: 501) .
 func NotImplemented(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Uknown type", http.StatusNotImplemented)
 }
 
+// NotFound handler returns HTTP StatusNotFound (code: 404).
 func NotFound(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Not Found", http.StatusNotFound)
 }
@@ -145,15 +150,4 @@ func gzipHandle(next http.Handler) http.Handler {
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
 	})
-}
-
-func (s Service) PingDBHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	if err := s.db.PingContext(ctx); err != nil {
-		log.Println(err)
-		http.Error(w, "Error in DB connection.", http.StatusInternalServerError)
-		return
-	}
-	w.WriteHeader(http.StatusOK)
 }
