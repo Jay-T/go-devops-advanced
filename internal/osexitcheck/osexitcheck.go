@@ -28,10 +28,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	checkFuncName := func(x *ast.FuncDecl) bool {
-		if x.Name.Name == "main" {
-			return true
-		}
-		return false
+		return x.Name.Name == "main"
 	}
 
 	for _, file := range pass.Files {
