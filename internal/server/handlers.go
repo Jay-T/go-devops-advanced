@@ -34,7 +34,10 @@ func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html")
 	tmpl := template.Must(template.New("").Parse(string(htmlPage)))
-	tmpl.Execute(w, dataMap)
+	err := tmpl.Execute(w, dataMap)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 // SetMetricHandler saves metric from HTTP POST request.
@@ -42,10 +45,11 @@ func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := GetBody(r)
+		var remoteHash []byte
 
 		if s.Cfg.Key != "" {
 			localHash := s.GenerateHash(m)
-			remoteHash, err := hex.DecodeString(m.Hash)
+			remoteHash, err = hex.DecodeString(m.Hash)
 			if err != nil {
 				http.Error(w, "Hash validation error", http.StatusInternalServerError)
 				return
@@ -62,7 +66,10 @@ func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper)
 		}
 		s.saveMetric(ctx, backuper, m)
 		w.WriteHeader(http.StatusOK)
-		r.Body.Close()
+		err = r.Body.Close()
+		if err != nil {
+			log.Print(err)
+		}
 	})
 }
 
@@ -81,8 +88,14 @@ func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBacku
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveListToDB(ctx, &m, backuper)
-		r.Body.Close()
+		err = s.saveListToDB(ctx, &m, backuper)
+		if err != nil {
+			log.Print(err)
+		}
+		err = r.Body.Close()
+		if err != nil {
+			log.Print(err)
+		}
 	})
 }
 
@@ -90,11 +103,15 @@ func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBacku
 // URI: "/value/".
 func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	m, err := GetBody(r)
-	r.Body.Close()
 	if err != nil {
 		http.Error(w, "Internal error during JSON unmarshal", http.StatusInternalServerError)
 		return
 	}
+	err = r.Body.Close()
+	if err != nil {
+		log.Print(err)
+	}
+
 	w.Header().Add("Content-Type", "application/json")
 	data, found := s.Metrics[m.ID]
 	if !found {
@@ -111,7 +128,10 @@ func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Internal error during JSON marshal", http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write(res)
+	_, err = w.Write(res)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 // NotImplemented handler returns HTTP StatusNotImplemented (code: 501) .
@@ -142,10 +162,18 @@ func gzipHandle(next http.Handler) http.Handler {
 
 		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
 		if err != nil {
-			io.WriteString(w, err.Error())
+			_, err = io.WriteString(w, err.Error())
+			if err != nil {
+				log.Print(err)
+			}
 			return
 		}
-		defer gz.Close()
+		defer func() {
+			err = gz.Close()
+			if err != nil {
+				log.Print(err)
+			}
+		}()
 
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)

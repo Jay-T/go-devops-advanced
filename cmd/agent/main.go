@@ -1,3 +1,4 @@
+// Application collects system metrics and sends to server.
 package main
 
 import (

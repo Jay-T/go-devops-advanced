@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log"
 	"testing"
 	"time"
 
@@ -28,7 +29,12 @@ func TestDBInit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Print(err)
+		}
+	}()
 	ctx := context.TODO()
 
 	dbs := &DBStorageBackuper{
@@ -50,7 +56,12 @@ func TestRestoreMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Print(err)
+		}
+	}()
 	ctx := context.TODO()
 
 	dbs := &DBStorageBackuper{
@@ -67,7 +78,10 @@ func TestRestoreMetrics(t *testing.T) {
 		WillDelayFor(1 * time.Second).
 		WillReturnRows(rs)
 
-	dbs.RestoreMetrics(ctx, s.Metrics)
+	err = dbs.RestoreMetrics(ctx, s.Metrics)
+	if err != nil {
+		log.Print(err)
+	}
 	assert.Equal(t, s.Metrics["Alloc"], Metric{
 		ID:    "Alloc",
 		MType: gauge,
@@ -81,7 +95,12 @@ func TestSaveMetricToDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Print(err)
+		}
+	}()
 	ctx := context.TODO()
 
 	dbs := &DBStorageBackuper{
@@ -124,7 +143,12 @@ func TestSaveListToDB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Print(err)
+		}
+	}()
 	ctx := context.TODO()
 
 	dbs := &DBStorageBackuper{

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -78,7 +79,10 @@ func TestSetMetricHandler(t *testing.T) {
 			res := w.Result()
 
 			assert.Equal(t, tt.wantCode, res.StatusCode)
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 		})
 	}
 }
@@ -134,7 +138,10 @@ func TestGetMetricHandler(t *testing.T) {
 			res := w.Result()
 
 			assert.Equal(t, tt.wantCode, res.StatusCode)
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 		})
 	}
 }
@@ -214,7 +221,12 @@ func TestSetMetricListHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	ctx := context.TODO()
 
 	s := Service{
@@ -276,7 +288,10 @@ func TestSetMetricListHandler(t *testing.T) {
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 			assert.Equal(t, res.StatusCode, tt.want)
 
 		})
@@ -288,7 +303,12 @@ func TestCheckStorageStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	dbs := &DBStorageBackuper{
 		db: db,
@@ -303,7 +323,10 @@ func TestCheckStorageStatus(t *testing.T) {
 	h.ServeHTTP(w, request)
 	res := w.Result()
 	assert.Equal(t, res.StatusCode, 200)
-	res.Body.Close()
+	err = res.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 
 	mock.ExpectPing().WillReturnError(New("TestError"))
 	w = httptest.NewRecorder()
@@ -311,6 +334,9 @@ func TestCheckStorageStatus(t *testing.T) {
 
 	h.ServeHTTP(w, request)
 	res = w.Result()
-	defer res.Body.Close()
+	err = res.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 	assert.Equal(t, res.StatusCode, 500)
 }

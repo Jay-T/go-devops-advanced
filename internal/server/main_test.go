@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -78,7 +79,10 @@ func TestSetMetricOldHandler(t *testing.T) {
 			res := w.Result()
 
 			assert.Equal(t, tt.wantCode, res.StatusCode)
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 		})
 	}
 }
@@ -121,7 +125,10 @@ func TestGetBody(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "http://yandex.ru", bytes.NewBuffer(mSer))
 
 			got, _ := GetBody(request)
-			request.Body.Close()
+			err := request.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 			assert.Equal(t, tt.metric, *got)
 		})
 	}

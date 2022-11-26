@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -14,7 +15,11 @@ func ExampleService_GetAllMetricHandler() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleService_SetMetricHandler() {
@@ -31,7 +36,10 @@ func ExampleService_SetMetricHandler() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleService_SetMetricListHandler() {
@@ -48,7 +56,10 @@ func ExampleService_SetMetricListHandler() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleService_GetMetricHandler() {
@@ -65,7 +76,10 @@ func ExampleService_GetMetricHandler() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleService_SetMetricOldHandler() {
@@ -78,7 +92,10 @@ func ExampleService_SetMetricOldHandler() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleService_SetMetricOldHandler_second() {
@@ -91,7 +108,10 @@ func ExampleService_SetMetricOldHandler_second() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleService_GetMetricOldHandler() {
@@ -103,7 +123,10 @@ func ExampleService_GetMetricOldHandler() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }
 
 func ExampleDBStorageBackuper_CheckStorageStatus() {
@@ -113,5 +136,8 @@ func ExampleDBStorageBackuper_CheckStorageStatus() {
 	if err != nil {
 		fmt.Printf("%s", err.Error())
 	}
-	defer resp.Body.Close()
+	err = resp.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 }

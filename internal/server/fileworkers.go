@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 )
 
@@ -55,7 +56,14 @@ func NewConsumer(filename string, flags int) (*consumer, error) {
 
 // ReadEvents reads metrics from file, decodes them as MetricList.
 func (c *consumer) ReadEvents(metrics map[string]Metric) error {
-	defer c.Close()
+	var err error
+
+	defer func() {
+		err = c.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	MetricList := []Metric{}
 	if err := c.decoder.Decode(&MetricList); err != nil {
 		return err

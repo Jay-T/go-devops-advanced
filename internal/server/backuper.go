@@ -39,10 +39,14 @@ func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[st
 		return err
 	}
 	for _, metric := range mMap {
-		_, err := stmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
+		_, err = stmt.ExecContext(ctx, metric.ID, metric.MType, metric.Delta, metric.Value)
 		if err != nil {
 			log.Println(err)
-			tx.Rollback()
+			errRollback := tx.Rollback()
+			if errRollback != nil {
+				log.Println(errRollback)
+				return errRollback
+			}
 			return err
 		}
 	}
@@ -63,7 +67,13 @@ func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap ma
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
 	for rows.Next() {
 		var rec Metric
 		err = rows.Scan(&rec.ID, &rec.MType, &rec.Delta, &rec.Value)
@@ -130,10 +140,13 @@ func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap ma
 	for _, metric := range mMap {
 		MetricList = append(MetricList, metric)
 	}
-	if err := producer.WriteMetric(&MetricList); err != nil {
+	if err = producer.WriteMetric(&MetricList); err != nil {
 		log.Fatal(err)
 	}
-	producer.Close()
+	err = producer.Close()
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -144,14 +157,21 @@ func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMa
 	if err != nil {
 		return err
 	}
-	consumer.ReadEvents(mMap)
+	err = consumer.ReadEvents(mMap)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 // CheckStorageStatus checks nothing here. Interface requirement.
 // URI: "/ping".
 func (fileBackuper *FileStorageBackuper) CheckStorageStatus(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("The storage file is pretty fine."))
+	_, err := w.Write([]byte("The storage file is pretty fine."))
+	if err != nil {
+		log.Println(err)
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 

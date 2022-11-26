@@ -122,7 +122,10 @@ func (s Service) saveMetric(ctx context.Context, backuper StorageBackuper, m *Me
 	default:
 		log.Printf("Metric type '%s' is not expected. Skipping.", m.MType)
 	}
-	backuper.SaveMetric(ctx, s.Metrics)
+	err := backuper.SaveMetric(ctx, s.Metrics)
+	if err != nil {
+		log.Print(err)
+	}
 }
 
 // StartRecordInterval preiodically saves metrics.
@@ -187,7 +190,10 @@ func (s Service) GenerateHash(m *Metric) []byte {
 // CloseApp closes http application.
 func (s Service) StopServer(ctx context.Context, cancel context.CancelFunc, backuper StorageBackuper) {
 	log.Println("Received a SIGINT! Stopping application")
-	backuper.SaveMetric(ctx, s.Metrics)
+	err := backuper.SaveMetric(ctx, s.Metrics)
+	if err != nil {
+		log.Print(err)
+	}
 	cancel()
 	log.Println("Canceled all goroutines.")
 	os.Exit(1)

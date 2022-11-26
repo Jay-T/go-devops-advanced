@@ -68,7 +68,10 @@ func Test_SendData(t *testing.T) {
 				log.Fatal(err)
 			}
 			srv := httptest.NewUnstartedServer(handlers())
-			srv.Listener.Close()
+			err = srv.Listener.Close()
+			if err != nil {
+				log.Println(err)
+			}
 			srv.Listener = l
 			srv.Start()
 
@@ -133,7 +136,10 @@ func Test_SendDataOld(t *testing.T) {
 				log.Fatal(err)
 			}
 			srv := httptest.NewUnstartedServer(handlers())
-			srv.Listener.Close()
+			err = srv.Listener.Close()
+			if err != nil {
+				log.Println(err)
+			}
 			srv.Listener = l
 			srv.Start()
 

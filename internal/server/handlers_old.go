@@ -76,5 +76,8 @@ func (s Service) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
 		returnValue = float64(*val.Value)
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprint(returnValue)))
+	_, err := w.Write([]byte(fmt.Sprint(returnValue)))
+	if err != nil {
+		log.Print(err)
+	}
 }
