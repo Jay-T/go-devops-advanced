@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -339,4 +340,70 @@ func TestCheckStorageStatus(t *testing.T) {
 		log.Println(err)
 	}
 	assert.Equal(t, res.StatusCode, 500)
+}
+
+func NewDelta(n int64) *int64 {
+	return &n
+}
+
+func TestGetMetricOldHandler(t *testing.T) {
+	s := Service{
+		Metrics: map[string]Metric{
+			"PollCount": {
+				ID:    "PollCount",
+				MType: counter,
+				Delta: NewDelta(2),
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		URI       string
+		wantValue string
+		wantCode  int
+	}{
+		{
+			name:      "TestOne",
+			URI:       "/value/counter/PollCount",
+			wantValue: "2",
+			wantCode:  http.StatusOK,
+		},
+		{
+			name:      "TestTwo",
+			URI:       "/value/PollCount",
+			wantValue: "There is no metric you requested\n",
+			wantCode:  http.StatusNotFound,
+		},
+		{
+			name:      "TestThree",
+			URI:       "/value/counter/wrongpath/PollCount",
+			wantValue: "There is no metric you requested\n",
+			wantCode:  http.StatusNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, tt.URI, nil)
+			w := httptest.NewRecorder()
+			h := http.HandlerFunc(s.GetMetricOldHandler)
+
+			h.ServeHTTP(w, request)
+			resp := w.Result()
+
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			value := string(bodyBytes)
+
+			assert.Equal(t, tt.wantCode, resp.StatusCode)
+			assert.Equal(t, tt.wantValue, value, "Function returned unexpected metric value")
+
+			err = resp.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
+		})
+	}
 }
