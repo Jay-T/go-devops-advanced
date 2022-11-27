@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	_ "net/http/pprof"
 	"os"
@@ -13,7 +14,14 @@ import (
 	"github.com/Jay-T/go-devops.git/internal/agent"
 )
 
+var (
+	buildVersion string = "N/A"
+	buildDate    string = "N/A"
+	buildCommit  string = "N/A"
+)
+
 func main() {
+	fmt.Printf("Build version: %s\nBuild date: %s\nBuild commit: %s\n", buildVersion, buildDate, buildCommit)
 	a, err := agent.NewAgent()
 	if err != nil {
 		log.Fatalf("Could not load agent config. Error: %s", err)
