@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -78,7 +80,10 @@ func TestSetMetricHandler(t *testing.T) {
 			res := w.Result()
 
 			assert.Equal(t, tt.wantCode, res.StatusCode)
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 		})
 	}
 }
@@ -134,7 +139,10 @@ func TestGetMetricHandler(t *testing.T) {
 			res := w.Result()
 
 			assert.Equal(t, tt.wantCode, res.StatusCode)
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 		})
 	}
 }
@@ -214,7 +222,12 @@ func TestSetMetricListHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 	ctx := context.TODO()
 
 	s := Service{
@@ -276,7 +289,10 @@ func TestSetMetricListHandler(t *testing.T) {
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
-			defer res.Body.Close()
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
 			assert.Equal(t, res.StatusCode, tt.want)
 
 		})
@@ -288,7 +304,12 @@ func TestCheckStorageStatus(t *testing.T) {
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
 	}
-	defer db.Close()
+	defer func() {
+		err = db.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
 
 	dbs := &DBStorageBackuper{
 		db: db,
@@ -303,7 +324,10 @@ func TestCheckStorageStatus(t *testing.T) {
 	h.ServeHTTP(w, request)
 	res := w.Result()
 	assert.Equal(t, res.StatusCode, 200)
-	res.Body.Close()
+	err = res.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 
 	mock.ExpectPing().WillReturnError(New("TestError"))
 	w = httptest.NewRecorder()
@@ -311,6 +335,75 @@ func TestCheckStorageStatus(t *testing.T) {
 
 	h.ServeHTTP(w, request)
 	res = w.Result()
-	defer res.Body.Close()
+	err = res.Body.Close()
+	if err != nil {
+		log.Println(err)
+	}
 	assert.Equal(t, res.StatusCode, 500)
+}
+
+func NewDelta(n int64) *int64 {
+	return &n
+}
+
+func TestGetMetricOldHandler(t *testing.T) {
+	s := Service{
+		Metrics: map[string]Metric{
+			"PollCount": {
+				ID:    "PollCount",
+				MType: counter,
+				Delta: NewDelta(2),
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		URI       string
+		wantValue string
+		wantCode  int
+	}{
+		{
+			name:      "TestOne",
+			URI:       "/value/counter/PollCount",
+			wantValue: "2",
+			wantCode:  http.StatusOK,
+		},
+		{
+			name:      "TestTwo",
+			URI:       "/value/PollCount",
+			wantValue: "There is no metric you requested\n",
+			wantCode:  http.StatusNotFound,
+		},
+		{
+			name:      "TestThree",
+			URI:       "/value/counter/wrongpath/PollCount",
+			wantValue: "There is no metric you requested\n",
+			wantCode:  http.StatusNotFound,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			request := httptest.NewRequest(http.MethodGet, tt.URI, nil)
+			w := httptest.NewRecorder()
+			h := http.HandlerFunc(s.GetMetricOldHandler)
+
+			h.ServeHTTP(w, request)
+			resp := w.Result()
+
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				log.Fatal(err)
+			}
+			value := string(bodyBytes)
+
+			assert.Equal(t, tt.wantCode, resp.StatusCode)
+			assert.Equal(t, tt.wantValue, value, "Function returned unexpected metric value")
+
+			err = resp.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
+		})
+	}
 }

@@ -140,8 +140,11 @@ func (a *Agent) sendData(m *Metric) error {
 		return err
 	}
 
-	defer resp.Body.Close()
-	return err
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // GetDataByInterval gouroutine polls memory metrics each time it receives signal from syncChan.
@@ -244,8 +247,11 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 		return err
 	}
 
-	defer resp.Body.Close()
-	return err
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // SendDataByInterval gorouting sends data to server every specified interval.
@@ -271,7 +277,10 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 				dataChan <- Data{name: "PollCount", counterValue: 0}
 			}
 			if len(mList) > 0 {
-				a.sendBulkData(&mList)
+				err := a.sendBulkData(&mList)
+				if err != nil {
+					log.Print(err)
+				}
 			}
 		case <-ctx.Done():
 			log.Println("Context has been canceled successfully.")

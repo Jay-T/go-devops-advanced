@@ -19,6 +19,9 @@ func (a *Agent) sendDataOld(m *Metric) error {
 		log.Println(err)
 		return err
 	}
-	defer resp.Body.Close()
-	return err
+	err = resp.Body.Close()
+	if err != nil {
+		return err
+	}
+	return nil
 }
