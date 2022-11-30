@@ -6,6 +6,12 @@
 //
 // 2. Run the app:  go vet -vettool=staticlint ./...
 //
+// In case of explicit file build:
+//
+// 1. In project folder make: go build ./cmd/staticlint/multichecker.go
+//
+// 2. Run the app: go vet -vettool=multichecker ./...
+//
 // # Used Analyzers
 //
 // • asmdecl.Analyzer - report mismatches between assembly files and Go declarations.

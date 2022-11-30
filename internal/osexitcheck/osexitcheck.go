@@ -14,16 +14,24 @@ var OsExitCheckAnalyzer = &analysis.Analyzer{
 }
 
 func run(pass *analysis.Pass) (interface{}, error) {
-	checkOsExit := func(x *ast.ExprStmt, isMain bool) {
-		if c, ok := x.X.(*ast.CallExpr); ok {
-			if s, ok := c.Fun.(*ast.SelectorExpr); ok {
-				// только функции Println
-				if y, ok := s.X.(*ast.Ident); ok {
-					if y.Name == "os" && s.Sel.Name == "Exit" && isMain {
-						pass.Reportf(x.Pos(), "should not use os.Exit() in main().")
-					}
-				}
-			}
+	checkOsExitExistence := func(x *ast.ExprStmt) {
+		c, ok := x.X.(*ast.CallExpr)
+		if !ok {
+			return
+		}
+
+		s, ok := c.Fun.(*ast.SelectorExpr)
+		if !ok {
+			return
+		}
+
+		y, ok := s.X.(*ast.Ident)
+		if !ok {
+			return
+		}
+
+		if y.Name == "os" && s.Sel.Name == "Exit" {
+			pass.Reportf(x.Pos(), "should not use os.Exit() in main().")
 		}
 	}
 
@@ -32,13 +40,15 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	}
 
 	for _, file := range pass.Files {
-		isMain := false
+		isMainFunc := false
 		ast.Inspect(file, func(node ast.Node) bool {
 			switch x := node.(type) {
 			case *ast.FuncDecl:
-				isMain = checkFuncName(x)
+				isMainFunc = checkFuncName(x)
 			case *ast.ExprStmt:
-				checkOsExit(x, isMain)
+				if isMainFunc {
+					checkOsExitExistence(x)
+				}
 			}
 			return true
 		})
