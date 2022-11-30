@@ -151,6 +151,7 @@ func TestStartServer(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	go s.StartServer(ctx, fs)
 
+	time.Sleep(1 * time.Second)
 	url := fmt.Sprintf("http://%s", s.Cfg.Address)
 	resp, err := http.Get(url)
 	if err != nil {
