@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"crypto/hmac"
@@ -44,7 +45,7 @@ func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 // URI: "/update/".
 func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		m, err := GetBody(r)
+		m, err := s.GetBody(r)
 		var remoteHash []byte
 
 		if s.Cfg.Key != "" {
@@ -102,7 +103,7 @@ func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBacku
 // GetMetricHandler returns a metric which was specified in HTTP POST request.
 // URI: "/value/".
 func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
-	m, err := GetBody(r)
+	m, err := s.GetBody(r)
 	if err != nil {
 		http.Error(w, "Internal error during JSON unmarshal", http.StatusInternalServerError)
 		return
@@ -177,5 +178,25 @@ func gzipHandle(next http.Handler) http.Handler {
 
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+	})
+}
+
+func (s *Service) decryptHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "Could not read request body.", http.StatusBadRequest)
+			return
+		}
+
+		if len(body) > 0 {
+			body, err = s.Decryptor.decrypt(body)
+			if err != nil {
+				http.Error(w, "Could not decrypt message.", http.StatusBadRequest)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewBuffer(body))
+		}
+		next.ServeHTTP(w, r)
 	})
 }

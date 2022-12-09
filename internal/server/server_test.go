@@ -91,6 +91,15 @@ func TestSetMetricOldHandler(t *testing.T) {
 }
 
 func TestGetBody(t *testing.T) {
+	s := Service{
+		Cfg: &Config{
+			Address:       "localhost:8080",
+			StoreInterval: 10,
+			StoreFile:     "file.json",
+			Restore:       true,
+		},
+		Metrics: map[string]Metric{},
+	}
 	tests := []struct {
 		name    string
 		metric  Metric
@@ -127,7 +136,7 @@ func TestGetBody(t *testing.T) {
 			mSer, _ := json.Marshal(tt.metric)
 			request := httptest.NewRequest(http.MethodGet, "http://yandex.ru", bytes.NewBuffer(mSer))
 
-			got, _ := GetBody(request)
+			got, _ := s.GetBody(request)
 			err := request.Body.Close()
 			if err != nil {
 				log.Println(err)

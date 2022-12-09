@@ -58,6 +58,7 @@ type Config struct {
 	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
 	PollInterval   time.Duration `env:"POLL_INTERVAL"`
 	Key            string        `env:"KEY"`
+	CryptoKey      string        `env:"CRYPTO_KEY"`
 }
 
 // RewriteConfigWithEnvs rewrites values from ENV variables if same variable is specified as flag.
@@ -68,6 +69,7 @@ func GetConfig() (*Config, error) {
 	flag.DurationVar(&c.ReportInterval, "r", time.Duration(10*time.Second), "Metric report to server interval")
 	flag.DurationVar(&c.PollInterval, "p", time.Duration(2*time.Second), "Metric poll interval")
 	flag.StringVar(&c.Key, "k", "testkey", "Encryption key")
+	flag.StringVar(&c.CryptoKey, "crypto-key", "", "Path to public key")
 	flag.Parse()
 
 	err := env.Parse(c)
@@ -88,9 +90,10 @@ type Data struct {
 
 // Agent struct accepts Config and handles all metrics manipulations.
 type Agent struct {
-	Cfg     *Config
-	Metrics map[string]Metric
-	l       sync.RWMutex
+	Cfg       *Config
+	Metrics   map[string]Metric
+	l         sync.RWMutex
+	Encryptor *Encryptor
 }
 
 // NewAgent configures Agent and returns pointer on it.
@@ -103,6 +106,13 @@ func NewAgent() (*Agent, error) {
 	}
 	a.Metrics = map[string]Metric{}
 	a.Cfg = cfg
+
+	if a.Cfg.CryptoKey != "" {
+		a.Encryptor, err = NewEncryptor(a.Cfg.CryptoKey)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &a, nil
 }
@@ -134,10 +144,22 @@ func (a *Agent) sendData(m *Metric) error {
 	}
 	url = fmt.Sprintf("http://%s/update/", a.Cfg.Address)
 
+	if a.Encryptor != nil {
+		mSer, err = a.Encryptor.encrypt(mSer)
+		if err != nil {
+			return err
+		}
+	}
+
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(mSer))
 
 	if err != nil {
 		return err
+	}
+
+	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !statusOK {
+		return NewDecryptError(fmt.Sprintf("Non-OK HTTP status: %d", resp.StatusCode))
 	}
 
 	err = resp.Body.Close()
@@ -233,18 +255,28 @@ func (a *Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data)
 }
 
 func (a *Agent) sendBulkData(mList *[]Metric) error {
-	var url string
-
+	url := fmt.Sprintf("http://%s/updates/", a.Cfg.Address)
 	mSer, err := json.Marshal(*mList)
 	if err != nil {
 		return err
 	}
-	url = fmt.Sprintf("http://%s/updates/", a.Cfg.Address)
+	if a.Encryptor != nil {
+		mSer, err = a.Encryptor.encrypt(mSer)
+		if err != nil {
+			return err
+		}
+	}
+
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(mSer))
 
 	if err != nil {
 		log.Println(err)
 		return err
+	}
+
+	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !statusOK {
+		return NewDecryptError(fmt.Sprintf("Non-OK HTTP status: %d", resp.StatusCode))
 	}
 
 	err = resp.Body.Close()
