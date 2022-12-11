@@ -35,19 +35,19 @@ type Config struct {
 func (config *Config) UnmarshalJSON(b []byte) error {
 	type MyTypeAlias Config
 
-	unmarshalledJson := &struct {
+	unmarshalledJSON := &struct {
 		*MyTypeAlias
 		ReportInterval interface{} `json:"report_interval"`
 		PollInterval   interface{} `json:"poll_interval"`
 	}{
 		MyTypeAlias: (*MyTypeAlias)(config),
 	}
-	err := json.Unmarshal(b, &unmarshalledJson)
+	err := json.Unmarshal(b, &unmarshalledJSON)
 	if err != nil {
 		return err
 	}
 
-	switch value := unmarshalledJson.ReportInterval.(type) {
+	switch value := unmarshalledJSON.ReportInterval.(type) {
 	case float64:
 		config.ReportInterval = time.Duration(value) * time.Second
 	case string:
@@ -56,10 +56,10 @@ func (config *Config) UnmarshalJSON(b []byte) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("invalid duration: %#v", unmarshalledJson)
+		return fmt.Errorf("invalid duration: %#v", unmarshalledJSON)
 	}
 
-	switch value := unmarshalledJson.PollInterval.(type) {
+	switch value := unmarshalledJSON.PollInterval.(type) {
 	case float64:
 		config.PollInterval = time.Duration(value) * time.Second
 	case string:
@@ -68,7 +68,7 @@ func (config *Config) UnmarshalJSON(b []byte) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("invalid duration: %#v", unmarshalledJson)
+		return fmt.Errorf("invalid duration: %#v", unmarshalledJSON)
 	}
 
 	return nil

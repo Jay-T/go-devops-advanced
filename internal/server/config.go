@@ -39,18 +39,18 @@ type Config struct {
 func (config *Config) UnmarshalJSON(b []byte) error {
 	type MyTypeAlias Config
 
-	unmarshalledJson := &struct {
+	unmarshalledJSON := &struct {
 		*MyTypeAlias
 		StoreInterval interface{} `json:"store_interval"`
 	}{
 		MyTypeAlias: (*MyTypeAlias)(config),
 	}
-	err := json.Unmarshal(b, &unmarshalledJson)
+	err := json.Unmarshal(b, &unmarshalledJSON)
 	if err != nil {
 		return err
 	}
 
-	switch value := unmarshalledJson.StoreInterval.(type) {
+	switch value := unmarshalledJSON.StoreInterval.(type) {
 	case float64:
 		config.StoreInterval = time.Duration(value) * time.Second
 	case string:
@@ -59,7 +59,7 @@ func (config *Config) UnmarshalJSON(b []byte) error {
 			return err
 		}
 	default:
-		return fmt.Errorf("invalid duration: %#v", unmarshalledJson)
+		return fmt.Errorf("invalid duration: %#v", unmarshalledJSON)
 	}
 
 	return nil
