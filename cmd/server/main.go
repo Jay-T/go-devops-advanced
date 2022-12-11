@@ -36,7 +36,7 @@ func main() {
 
 	s, err := server.NewService(ctx, cfg, backuper)
 	if err != nil {
-		log.Fatalf("Could not load agent config. Error: %s", err)
+		log.Fatalf("Could not load server config. Error: %s", err)
 	}
 
 	sigChan := make(chan os.Signal, 1)

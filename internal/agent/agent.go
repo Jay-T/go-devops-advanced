@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -19,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/caarlos0/env"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 )
@@ -50,35 +48,6 @@ func (m Metric) GetValueInt() int64 {
 // GetValueFloat returns pointer to float64 value.
 func (m Metric) GetValueFloat() float64 {
 	return *m.Value
-}
-
-// Config struct describes application config.
-type Config struct {
-	Address        string        `env:"ADDRESS"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	Key            string        `env:"KEY"`
-	CryptoKey      string        `env:"CRYPTO_KEY"`
-}
-
-// RewriteConfigWithEnvs rewrites values from ENV variables if same variable is specified as flag.
-func GetConfig() (*Config, error) {
-	c := &Config{}
-
-	flag.StringVar(&c.Address, "a", "localhost:8080", "Address for sending data to")
-	flag.DurationVar(&c.ReportInterval, "r", time.Duration(10*time.Second), "Metric report to server interval")
-	flag.DurationVar(&c.PollInterval, "p", time.Duration(2*time.Second), "Metric poll interval")
-	flag.StringVar(&c.Key, "k", "testkey", "Encryption key")
-	flag.StringVar(&c.CryptoKey, "crypto-key", "", "Path to public key")
-	flag.Parse()
-
-	err := env.Parse(c)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-
-	return c, nil
 }
 
 // Data struct describes message format between goroutines
@@ -173,6 +142,7 @@ func (a *Agent) sendData(m *Metric) error {
 func (a *Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, syncChan <-chan time.Time) {
 	var rtm runtime.MemStats
 
+	log.Printf("Polling data with interval: %s", a.Cfg.PollInterval)
 	for {
 		select {
 		case <-syncChan:
@@ -288,6 +258,9 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 
 // SendDataByInterval gorouting sends data to server every specified interval.
 func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
+	log.Printf("Sending data with interval: %s", a.Cfg.ReportInterval)
+	log.Printf("Sending data to: %s", a.Cfg.Address)
+
 	ticker := time.NewTicker(a.Cfg.ReportInterval)
 	for {
 		select {

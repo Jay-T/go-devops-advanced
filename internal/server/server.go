@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +13,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/caarlos0/env"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
@@ -32,39 +30,6 @@ type Metric struct {
 	Delta *int64   `json:"delta,omitempty"` // metric value in case of MType == counter
 	Value *float64 `json:"value,omitempty"` // metric value in case of MType == gauge
 	Hash  string   `json:"hash,omitempty"`  // hash value
-}
-
-// Config structure. Used for application configuration.
-type Config struct {
-	Address       string        `env:"ADDRESS"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL"`
-	StoreFile     string        `env:"STORE_FILE"`
-	Restore       bool          `env:"RESTORE"`
-	Key           string        `env:"KEY"`
-	DBAddress     string        `env:"DATABASE_DSN"`
-	CryptoKey     string        `env:"CRYPTO_KEY"`
-}
-
-// RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
-func GetConfig() (*Config, error) {
-	c := &Config{}
-
-	flag.StringVar(&c.Address, "a", "localhost:8080", "Socket to listen on")
-	flag.DurationVar(&c.StoreInterval, "i", time.Duration(300*time.Second), "Save data interval")
-	flag.StringVar(&c.StoreFile, "f", "/tmp/devops-metrics-db.json", "File for saving data")
-	flag.BoolVar(&c.Restore, "r", true, "Restore data from file")
-	flag.StringVar(&c.Key, "k", "", "Encryption key")
-	flag.StringVar(&c.DBAddress, "d", "", "Database address")
-	flag.StringVar(&c.CryptoKey, "crypto-key", "", "Path to private key")
-	flag.Parse()
-
-	err := env.Parse(c)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-
-	return c, nil
 }
 
 // Service structure. Holds application config and db connector.
