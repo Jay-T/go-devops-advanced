@@ -8,9 +8,11 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -307,4 +309,26 @@ func BenchmarkGetAllMetricHandler(b *testing.B) {
 			h.ServeHTTP(w, requestGet)
 		}
 	})
+}
+
+func TestStopServer(t *testing.T) {
+	s := &Service{}
+	fakeExit := func(i int) {}
+
+	patch := monkey.Patch(os.Exit, fakeExit)
+	defer patch.Unpatch()
+
+	ctx := context.TODO()
+	ctx, cancel := context.WithCancel(ctx)
+
+	fs := &FileStorageBackuper{
+		filename: "/tmp/test",
+	}
+
+	testFunc := func() int {
+		s.StopServer(ctx, cancel, fs)
+		return 1
+	}
+
+	assert.Equal(t, 1, testFunc())
 }

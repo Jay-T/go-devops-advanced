@@ -74,3 +74,9 @@ func TestSaveListToDB(t *testing.T) {
 	err = s.saveListToDB(ctx, &mList, dbs)
 	assert.Error(t, err)
 }
+
+func TestNewServiceDB(t *testing.T) {
+	ctx := context.TODO()
+	_, err := NewServiceDB(ctx, "teststring")
+	assert.NoError(t, err)
+}

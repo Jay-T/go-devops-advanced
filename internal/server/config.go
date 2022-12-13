@@ -69,11 +69,13 @@ func loadConfigFromFile(c *Config, filename string) (*Config, error) {
 	log.Printf("Loading config from file '%s'", filename)
 	fileBytes, err := os.ReadFile(filename)
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, err
 	}
 
 	err = json.Unmarshal(fileBytes, c)
 	if err != nil {
+		fmt.Println(err.Error())
 		return nil, err
 	}
 
