@@ -282,7 +282,7 @@ func (a *Agent) combineAndSend(dataChan chan<- Data) {
 }
 
 // SendDataByInterval gorouting sends data to server every specified interval.
-func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}) {
+func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	log.Printf("Sending data with interval: %s", a.Cfg.ReportInterval)
 	log.Printf("Sending data to: %s", a.Cfg.Address)
 
@@ -294,8 +294,8 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data, do
 		case <-ctx.Done():
 			log.Println("Received cancel command. Sending processed data.")
 			a.combineAndSend(dataChan)
-			doneChan <- struct{}{}
 
+			time.Sleep(3 * time.Second)
 			log.Println("Context has been canceled successfully.")
 			return
 		}
@@ -318,12 +318,11 @@ func (a *Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 }
 
 // StopAgent stops the application.
-func (a *Agent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, cancel context.CancelFunc) {
+func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
 	<-sigChan
 	log.Println("Receieved a SIGINT! Stopping the agent.")
 	cancel()
 
-	<-doneChan
 	log.Println("Stopped all goroutines.")
 
 	os.Exit(1)
