@@ -106,7 +106,7 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&c.Address, "a", c.Address, "Address for sending data to")
 	flag.DurationVar(&c.ReportInterval, "r", c.ReportInterval, "Metric report to server interval")
 	flag.DurationVar(&c.PollInterval, "p", c.PollInterval, "Metric poll interval")
-	flag.StringVar(&c.CryptoKey, c.CryptoKey, "", "Path to public key")
+	flag.StringVar(&c.CryptoKey, "crypto-key", c.CryptoKey, "Path to public key")
 	flag.StringVar(&c.Key, "k", "testkey", "Encryption key")
 	flag.StringVar(&c.ConfigFile, "config", "", "Config file name")
 	flag.StringVar(&c.ConfigFile, "c", "", "Config file name")

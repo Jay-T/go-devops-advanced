@@ -256,8 +256,33 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 	return nil
 }
 
+func (a *Agent) combineAndSend(dataChan chan<- Data) {
+	var mList []Metric
+	a.l.Lock()
+	for _, m := range a.Metrics {
+		err := a.sendData(&m)
+		if err != nil {
+			log.Printf("metric: %s, error: %s", m.ID, err)
+		}
+		mList = append(mList, m)
+		if m.ID == "PollCount" {
+			PollCount = 0
+		}
+	}
+	a.l.Unlock()
+	if PollCount == 0 {
+		dataChan <- Data{name: "PollCount", counterValue: 0}
+	}
+	if len(mList) > 0 {
+		err := a.sendBulkData(&mList)
+		if err != nil {
+			log.Print(err)
+		}
+	}
+}
+
 // SendDataByInterval gorouting sends data to server every specified interval.
-func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
+func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}) {
 	log.Printf("Sending data with interval: %s", a.Cfg.ReportInterval)
 	log.Printf("Sending data to: %s", a.Cfg.Address)
 
@@ -265,29 +290,12 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	for {
 		select {
 		case <-ticker.C:
-			var mList []Metric
-			a.l.Lock()
-			for _, m := range a.Metrics {
-				err := a.sendData(&m)
-				if err != nil {
-					log.Printf("metric: %s, error: %s", m.ID, err)
-				}
-				mList = append(mList, m)
-				if m.ID == "PollCount" {
-					PollCount = 0
-				}
-			}
-			a.l.Unlock()
-			if PollCount == 0 {
-				dataChan <- Data{name: "PollCount", counterValue: 0}
-			}
-			if len(mList) > 0 {
-				err := a.sendBulkData(&mList)
-				if err != nil {
-					log.Print(err)
-				}
-			}
+			a.combineAndSend(dataChan)
 		case <-ctx.Done():
+			log.Println("Received cancel command. Sending processed data.")
+			a.combineAndSend(dataChan)
+			doneChan <- struct{}{}
+
 			log.Println("Context has been canceled successfully.")
 			return
 		}
@@ -304,16 +312,18 @@ func (a *Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 			syncChan <- t
 		case <-ctx.Done():
 			log.Println("RunTicker has been canceled successfully.")
+			return
 		}
 	}
 }
 
 // StopAgent stops the application.
-func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
+func (a *Agent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, cancel context.CancelFunc) {
 	<-sigChan
 	log.Println("Receieved a SIGINT! Stopping the agent.")
-
 	cancel()
+
+	<-doneChan
 	log.Println("Stopped all goroutines.")
 
 	os.Exit(1)
@@ -321,18 +331,25 @@ func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
 
 // NewMetric saves new incoming Data from channel to metric map in Metric format.
 func (a *Agent) NewMetric(ctx context.Context, dataChan <-chan Data) {
+	assignValue := func(data Data) {
+		a.l.Lock()
+		if data.name == "PollCount" {
+			a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
+		} else {
+			a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
+		}
+		a.l.Unlock()
+	}
+
 	for {
 		select {
 		case data := <-dataChan:
-			a.l.Lock()
-			if data.name == "PollCount" {
-				a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
-			} else {
-				a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
-			}
-			a.l.Unlock()
+			assignValue(data)
 		case <-ctx.Done():
+			data := <-dataChan
+			assignValue(data)
 			log.Println("NewMetric has been canceled successfully.")
+			return
 		}
 	}
 }
