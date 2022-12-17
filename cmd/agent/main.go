@@ -30,7 +30,8 @@ func main() {
 	signal.Notify(sigChan,
 		syscall.SIGINT,
 		syscall.SIGTERM,
-		syscall.SIGQUIT)
+		syscall.SIGQUIT,
+		syscall.SIGKILL)
 	dataChan := make(chan agent.Data)
 	syncChan := make(chan time.Time)
 	doneChan := make(chan struct{})
