@@ -325,9 +325,18 @@ func (a *Agent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, ca
 	log.Println("Receieved a SIGINT! Stopping the agent.")
 	cancel()
 
-	<-doneChan
-	log.Println("Stopped all goroutines.")
-	os.Exit(1)
+	ticker := time.NewTicker(3 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("Stopped all goroutines.")
+			os.Exit(1)
+
+		case <-doneChan:
+			log.Println("Stopped all goroutines gracefully.")
+			os.Exit(1)
+		}
+	}
 }
 
 // NewMetric saves new incoming Data from channel to metric map in Metric format.
