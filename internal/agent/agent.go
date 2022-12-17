@@ -256,7 +256,7 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 	return nil
 }
 
-func (a *Agent) combineAndSend(dataChan chan<- Data) {
+func (a *Agent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
 	var mList []Metric
 	a.l.Lock()
 	for _, m := range a.Metrics {
@@ -270,6 +270,9 @@ func (a *Agent) combineAndSend(dataChan chan<- Data) {
 		}
 	}
 	a.l.Unlock()
+	if finFlag {
+		doneChan <- struct{}{}
+	}
 	if PollCount == 0 {
 		dataChan <- Data{name: "PollCount", counterValue: 0}
 	}
@@ -282,7 +285,7 @@ func (a *Agent) combineAndSend(dataChan chan<- Data) {
 }
 
 // SendDataByInterval gorouting sends data to server every specified interval.
-func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
+func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}) {
 	log.Printf("Sending data with interval: %s", a.Cfg.ReportInterval)
 	log.Printf("Sending data to: %s", a.Cfg.Address)
 
@@ -290,12 +293,11 @@ func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
 	for {
 		select {
 		case <-ticker.C:
-			a.combineAndSend(dataChan)
+			a.combineAndSend(dataChan, doneChan, false)
 		case <-ctx.Done():
 			log.Println("Received cancel command. Sending processed data.")
-			a.combineAndSend(dataChan)
+			a.combineAndSend(dataChan, doneChan, true)
 
-			time.Sleep(3 * time.Second)
 			log.Println("Context has been canceled successfully.")
 			return
 		}
@@ -318,13 +320,13 @@ func (a *Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 }
 
 // StopAgent stops the application.
-func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
+func (a *Agent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, cancel context.CancelFunc) {
 	<-sigChan
 	log.Println("Receieved a SIGINT! Stopping the agent.")
 	cancel()
 
+	<-doneChan
 	log.Println("Stopped all goroutines.")
-
 	os.Exit(1)
 }
 
