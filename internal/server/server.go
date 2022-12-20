@@ -150,8 +150,15 @@ func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 	}
 
 	srv.SetKeepAlivesEnabled(false)
-	log.Printf("Listening socket: %s", s.Cfg.Address)
-	log.Fatal(srv.ListenAndServe())
+	go func() {
+		log.Printf("Listening socket: %s", s.Cfg.Address)
+		log.Fatal(srv.ListenAndServe())
+
+		log.Println("Stopped to serve HTTP requests")
+	}()
+
+	<-ctx.Done()
+	srv.Shutdown(ctx)
 }
 
 // GenerateHash generates sha256 hash for http request's body fields for message validation.
