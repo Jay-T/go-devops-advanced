@@ -2,7 +2,7 @@
     "address": "localhost:8080",
     "restore": false,
     "store_interval": "10s",
-    "store_file": "",
+    "store_file": "/tmp/testfile",
     "database_dsn": "postgres://localhost/mydb?sslmode=disable",
     "crypto_key": "/Users/daniliuk-ve/work/go-devops-advanced/internal/server/cert/key.priv"
 } 

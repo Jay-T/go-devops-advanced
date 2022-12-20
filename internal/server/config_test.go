@@ -13,7 +13,7 @@ func TestUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		unparsed string
-		parsed   *Config
+		parsed   *ConfigFile
 	}{
 		{
 			name: "TestOne",
@@ -27,7 +27,7 @@ func TestUnmarshalJSON(t *testing.T) {
 				"crypto_key": "/Users/daniliuk-ve/work/go-devops-advanced/internal/server/cert/key.priv"
 			} 
 			`,
-			parsed: &Config{
+			parsed: &ConfigFile{
 				Address:       "localhost:8080",
 				Restore:       false,
 				StoreInterval: time.Duration(10 * time.Second),
@@ -36,21 +36,21 @@ func TestUnmarshalJSON(t *testing.T) {
 				CryptoKey:     "/Users/daniliuk-ve/work/go-devops-advanced/internal/server/cert/key.priv",
 			},
 		},
-		{
-			name: "TestTwo",
-			unparsed: `
-			{
-				"store_interval": 10
-			} 
-			`,
-			parsed: &Config{
-				StoreInterval: time.Duration(10 * time.Second),
-			},
-		},
+		// {
+		// 	name: "TestTwo",
+		// 	unparsed: `
+		// 	{
+		// 		"store_interval": 10
+		// 	}
+		// 	`,
+		// 	parsed: &Config{
+		// 		StoreInterval: time.Duration(10 * time.Second),
+		// 	},
+		// },
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Config{}
+			c := &ConfigFile{}
 			err := c.UnmarshalJSON([]byte(tt.unparsed))
 			if err != nil {
 				log.Fatal(err)
@@ -75,9 +75,10 @@ func TestLoadConfigFromFile(t *testing.T) {
 				Address:       "localhost:8080",
 				Restore:       false,
 				StoreInterval: time.Duration(10 * time.Second),
-				StoreFile:     "",
+				StoreFile:     "/tmp/testfile",
 				DBAddress:     "postgres://localhost/mydb?sslmode=disable",
 				CryptoKey:     "/Users/daniliuk-ve/work/go-devops-advanced/internal/server/cert/key.priv",
+				ConfigFile:    "test_config.json",
 			},
 			wantError: false,
 			errorText: "",
@@ -100,8 +101,16 @@ func TestLoadConfigFromFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Config{}
-			c, err := loadConfigFromFile(c, tt.filename)
+			c := &Config{
+				Address:       defaultAddress,
+				StoreInterval: defaultStoreInterval,
+				Restore:       defaultRestore,
+				StoreFile:     defaultStoreFile,
+				DBAddress:     defaultDBAddress,
+				CryptoKey:     defaultCryptoKey,
+				ConfigFile:    tt.filename,
+			}
+			err := loadConfigFromFile(c)
 			if tt.wantError {
 				assert.Error(t, err)
 				assert.Equal(t, tt.errorText, err.Error())

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/caarlos0/env"
@@ -24,24 +23,44 @@ const usage = `Usage of using_flag:
   -r Restore data from file (default true)
 `
 
+const (
+	defaultAddress       string        = "localhost:8080"
+	defaultStoreInterval time.Duration = time.Duration(300 * time.Second)
+	defaultStoreFile     string        = "/tmp/devops-metrics-db.json"
+	defaultRestore       bool          = false
+	defaultDBAddress     string        = ""
+	defaultCryptoKey     string        = ""
+	defaultKey           string        = ""
+	defaultConfig        string        = ""
+)
+
 // Config structure. Used for application configuration.
 type Config struct {
+	Address       string        `env:"ADDRESS"`
+	StoreInterval time.Duration `env:"STORE_INTERVAL"`
+	StoreFile     string        `env:"STORE_FILE"`
+	Restore       bool          `env:"RESTORE"`
+	Key           string        `env:"KEY"`
+	DBAddress     string        `env:"DATABASE_DSN"`
+	CryptoKey     string        `env:"CRYPTO_KEY"`
+	ConfigFile    string        `env:"CONFIG"`
+}
+
+type ConfigFile struct {
 	Address       string        `env:"ADDRESS" json:"address"`
 	StoreInterval time.Duration `env:"STORE_INTERVAL" json:"store_interval"`
 	StoreFile     string        `env:"STORE_FILE" json:"store_file"`
 	Restore       bool          `env:"RESTORE" json:"restore"`
-	Key           string        `env:"KEY"`
 	DBAddress     string        `env:"DATABASE_DSN" json:"database_dsn"`
 	CryptoKey     string        `env:"CRYPTO_KEY" json:"crypto_key"`
-	ConfigFile    string        `env:"CONFIG"`
 }
 
-func (config *Config) UnmarshalJSON(b []byte) error {
-	type MyTypeAlias Config
+func (config *ConfigFile) UnmarshalJSON(b []byte) error {
+	type MyTypeAlias ConfigFile
 
 	unmarshalledJSON := &struct {
 		*MyTypeAlias
-		StoreInterval interface{} `json:"store_interval"`
+		StoreInterval string `json:"store_interval"`
 	}{
 		MyTypeAlias: (*MyTypeAlias)(config),
 	}
@@ -50,105 +69,84 @@ func (config *Config) UnmarshalJSON(b []byte) error {
 		return err
 	}
 
-	switch value := unmarshalledJSON.StoreInterval.(type) {
-	case float64:
-		config.StoreInterval = time.Duration(value) * time.Second
-	case string:
-		config.StoreInterval, err = time.ParseDuration(value)
-		if err != nil {
-			return err
-		}
-	default:
-		return fmt.Errorf("invalid duration: %#v", unmarshalledJSON)
+	config.StoreInterval, err = time.ParseDuration(unmarshalledJSON.StoreInterval)
+	if err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func loadConfigFromFile(c *Config, filename string) (*Config, error) {
-	log.Printf("Loading config from file '%s'", filename)
-	fileBytes, err := os.ReadFile(filename)
-	if err != nil {
-		fmt.Println(err.Error())
-		return nil, err
+func loadConfigFromFile(c *Config) error {
+	if c.ConfigFile == "" {
+		return nil
 	}
 
-	err = json.Unmarshal(fileBytes, c)
+	log.Printf("Loading config from file '%s'", c.ConfigFile)
+	fileBytes, err := os.ReadFile(c.ConfigFile)
 	if err != nil {
 		fmt.Println(err.Error())
-		return nil, err
+		return err
 	}
 
-	return c, nil
+	var cfgFromFile ConfigFile
+	err = json.Unmarshal(fileBytes, &cfgFromFile)
+	if err != nil {
+		fmt.Println(err.Error())
+		return err
+	}
+
+	if c.Address == defaultAddress && cfgFromFile.Address != "" {
+		c.Address = cfgFromFile.Address
+	}
+
+	if c.StoreInterval == defaultStoreInterval && cfgFromFile.StoreInterval != 0 {
+		c.StoreInterval = cfgFromFile.StoreInterval
+	}
+
+	if c.StoreFile == defaultStoreFile && cfgFromFile.StoreFile != "" {
+		c.StoreFile = cfgFromFile.StoreFile
+	}
+
+	if !c.Restore && cfgFromFile.Restore {
+		c.Restore = cfgFromFile.Restore
+	}
+
+	if c.DBAddress == defaultDBAddress && cfgFromFile.DBAddress != "" {
+		c.DBAddress = cfgFromFile.DBAddress
+	}
+
+	if c.CryptoKey == defaultCryptoKey && cfgFromFile.CryptoKey != "" {
+		c.CryptoKey = cfgFromFile.CryptoKey
+	}
+
+	return nil
 }
 
 // RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
 func GetConfig() (*Config, error) {
-	c := &Config{
-		Address:       "localhost:8080",
-		StoreInterval: time.Duration(300 * time.Second),
-		StoreFile:     "/tmp/devops-metrics-db.json",
-		Restore:       true,
-		DBAddress:     "",
-		CryptoKey:     "",
-	}
+	c := &Config{}
 
-	c, err := PreFlagArgParse(c)
-	if err != nil {
-		return nil, err
-	}
-
-	flag.StringVar(&c.Address, "a", c.Address, "Socket to listen on")
-	flag.DurationVar(&c.StoreInterval, "i", c.StoreInterval, "Save data interval")
-	flag.StringVar(&c.StoreFile, "f", c.StoreFile, "File for saving data")
-	flag.BoolVar(&c.Restore, "r", c.Restore, "Restore data from file")
-	flag.StringVar(&c.DBAddress, "d", c.DBAddress, "Database address")
-	flag.StringVar(&c.CryptoKey, "crypto-key", c.CryptoKey, "Path to private key")
-	flag.StringVar(&c.Key, "k", "", "Encryption key")
-	flag.StringVar(&c.ConfigFile, "config", "", "Config file name")
-	flag.StringVar(&c.ConfigFile, "c", "", "Config file name")
+	flag.StringVar(&c.Address, "a", defaultAddress, "Socket to listen on")
+	flag.DurationVar(&c.StoreInterval, "i", defaultStoreInterval, "Save data interval")
+	flag.StringVar(&c.StoreFile, "f", defaultStoreFile, "File for saving data")
+	flag.BoolVar(&c.Restore, "r", defaultRestore, "Restore data from file")
+	flag.StringVar(&c.DBAddress, "d", defaultDBAddress, "Database address")
+	flag.StringVar(&c.CryptoKey, "crypto-key", defaultCryptoKey, "Path to private key")
+	flag.StringVar(&c.Key, "k", defaultKey, "Encryption key")
+	flag.StringVar(&c.ConfigFile, "config", defaultConfig, "Config file name")
+	flag.StringVar(&c.ConfigFile, "c", defaultConfig, "Config file name")
 	flag.Usage = func() { fmt.Print(usage) }
 	flag.Parse()
 
-	err = env.Parse(c)
+	err := env.Parse(c)
 	if err != nil {
 		log.Fatal(err)
-		return nil, err
 	}
 
-	return c, nil
-}
-
-func PreFlagArgParse(c *Config) (*Config, error) {
-	var filename string
-	var err error
-
-	for num, i := range os.Args {
-		if i != "-c" && i != "--config" && !strings.HasPrefix(i, "-c=") && !strings.HasPrefix(i, "--config=") {
-			continue
-		}
-
-		if strings.Contains(i, "=") {
-			filename = strings.Split(i, "=")[1]
-			continue
-		}
-		if num != len(os.Args)-1 {
-			filename = os.Args[num+1]
-		}
-	}
-
-	for _, i := range os.Environ() {
-		if !strings.Contains(i, "CONFIG=") {
-			continue
-		}
-		filename = strings.Split(i, "=")[1]
-	}
-
-	if filename != "" {
-		c, err = loadConfigFromFile(c, filename)
-		if err != nil {
-			return nil, err
-		}
+	err = loadConfigFromFile(c)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	return c, nil

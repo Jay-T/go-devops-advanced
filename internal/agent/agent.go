@@ -59,9 +59,9 @@ type Data struct {
 
 // Agent struct accepts Config and handles all metrics manipulations.
 type Agent struct {
-	Cfg       *Config
-	Metrics   map[string]Metric
-	l         sync.RWMutex
+	Cfg     *Config
+	Metrics map[string]Metric
+	sync.RWMutex
 	Encryptor *Encryptor
 }
 
@@ -258,7 +258,8 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 
 func (a *Agent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
 	var mList []Metric
-	a.l.Lock()
+	a.Lock()
+	defer a.Unlock()
 	for _, m := range a.Metrics {
 		err := a.sendData(&m)
 		if err != nil {
@@ -269,7 +270,6 @@ func (a *Agent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, f
 			PollCount = 0
 		}
 	}
-	a.l.Unlock()
 	if finFlag {
 		doneChan <- struct{}{}
 	}
@@ -342,13 +342,13 @@ func (a *Agent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, ca
 // NewMetric saves new incoming Data from channel to metric map in Metric format.
 func (a *Agent) NewMetric(ctx context.Context, dataChan <-chan Data) {
 	assignValue := func(data Data) {
-		a.l.Lock()
+		a.Lock()
+		defer a.Unlock()
 		if data.name == "PollCount" {
 			a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
 		} else {
 			a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
 		}
-		a.l.Unlock()
 	}
 
 	for {
