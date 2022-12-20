@@ -258,19 +258,23 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 
 func (a *Agent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
 	var mList []Metric
-	a.Lock()
 
-	for _, m := range a.Metrics {
-		err := a.sendData(&m)
-		if err != nil {
-			log.Printf("metric: %s, error: %s", m.ID, err)
+	func() {
+		a.Lock()
+		defer a.Unlock()
+
+		for _, m := range a.Metrics {
+			err := a.sendData(&m)
+			if err != nil {
+				log.Printf("metric: %s, error: %s", m.ID, err)
+			}
+			mList = append(mList, m)
+			if m.ID == "PollCount" {
+				PollCount = 0
+			}
 		}
-		mList = append(mList, m)
-		if m.ID == "PollCount" {
-			PollCount = 0
-		}
-	}
-	a.Unlock()
+	}()
+
 	if finFlag {
 		doneChan <- struct{}{}
 	}
