@@ -32,13 +32,26 @@ func NewDecryptor(privateKeyFile string) (*Decryptor, error) {
 }
 
 func (d *Decryptor) decrypt(msg []byte) ([]byte, error) {
-	var err error
 	var label []byte
 	hash := sha256.New()
-	d.decrypted, err = rsa.DecryptOAEP(hash, rand.Reader, d.privateKey, msg, label)
-	if err != nil {
-		return nil, err
+
+	msgLen := len(msg)
+	step := d.privateKey.Size()
+	var decryptedBytes []byte
+
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		decryptedBlockBytes, err := rsa.DecryptOAEP(hash, rand.Reader, d.privateKey, msg[start:finish], label)
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedBytes = append(decryptedBytes, decryptedBlockBytes...)
 	}
 
-	return d.decrypted, nil
+	return decryptedBytes, nil
 }
