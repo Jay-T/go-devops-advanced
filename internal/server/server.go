@@ -6,7 +6,6 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -14,7 +13,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/caarlos0/env"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
@@ -34,67 +32,23 @@ type Metric struct {
 	Hash  string   `json:"hash,omitempty"`  // hash value
 }
 
-// GetBody parses HTTP request's body and returns Metric.
-func GetBody(r *http.Request) (*Metric, error) {
-	body, err := io.ReadAll(r.Body)
-
-	if err != nil {
-		return nil, err
-	}
-	m := &Metric{}
-	err = json.Unmarshal(body, m)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-// Config structure. Used for application configuration.
-type Config struct {
-	Address       string        `env:"ADDRESS"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL"`
-	StoreFile     string        `env:"STORE_FILE"`
-	Restore       bool          `env:"RESTORE"`
-	Key           string        `env:"KEY"`
-	DBAddress     string        `env:"DATABASE_DSN"`
-}
-
-// RewriteConfigWithEnvs rewrites ENV values if the similiar flag is specified during application launch.
-func GetConfig() (*Config, error) {
-	c := &Config{}
-
-	flag.StringVar(&c.Address, "a", "localhost:8080", "Socket to listen on")
-	flag.DurationVar(&c.StoreInterval, "i", time.Duration(300*time.Second), "Save data interval")
-	flag.StringVar(&c.StoreFile, "f", "/tmp/devops-metrics-db.json", "File for saving data")
-	flag.BoolVar(&c.Restore, "r", true, "Restore data from file")
-	flag.StringVar(&c.Key, "k", "", "Encryption key")
-	flag.StringVar(&c.DBAddress, "d", "", "Database address")
-
-	flag.Parse()
-
-	err := env.Parse(c)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-
-	return c, nil
-}
-
 // Service structure. Holds application config and db connector.
 type Service struct {
-	Cfg     *Config
-	Metrics map[string]Metric
+	Cfg       *Config
+	Metrics   map[string]Metric
+	Decryptor *Decryptor
 }
 
 // NewService returns Service with config parsed from flags or ENV vars.
 func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Service, error) {
 	var s Service
+	var err error
+
 	s.Metrics = map[string]Metric{}
 	s.Cfg = cfg
 
 	if s.Cfg.Restore {
-		err := backuper.RestoreMetrics(ctx, s.Metrics)
+		err = backuper.RestoreMetrics(ctx, s.Metrics)
 		if err != nil {
 			log.Print("Error during data restoration.")
 			return nil, err
@@ -106,7 +60,30 @@ func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Se
 		go s.StartRecordInterval(ctx, backuper)
 	}
 
+	if s.Cfg.CryptoKey != "" {
+		s.Decryptor, err = NewDecryptor(s.Cfg.CryptoKey)
+		if err != nil {
+			return nil, err
+		}
+		log.Print("Crypto is enabled")
+	}
+
 	return &s, nil
+}
+
+// GetBody parses HTTP request's body and returns Metric.
+func (s *Service) GetBody(r *http.Request) (*Metric, error) {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	m := &Metric{}
+	err = json.Unmarshal(body, m)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func (s Service) saveMetric(ctx context.Context, backuper StorageBackuper, m *Metric) {
@@ -148,7 +125,11 @@ func (s Service) StartRecordInterval(ctx context.Context, backuper StorageBackup
 // StartServer launches HTTP server.
 func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 	r := chi.NewRouter()
+	// middlewares
 	r.Use(gzipHandle)
+	if s.Decryptor != nil {
+		r.Use(s.decryptHandler)
+	}
 	r.Mount("/debug", middleware.Profiler())
 	// old methods
 	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
@@ -167,6 +148,7 @@ func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 		Addr:    s.Cfg.Address,
 		Handler: r,
 	}
+
 	srv.SetKeepAlivesEnabled(false)
 	log.Printf("Listening socket: %s", s.Cfg.Address)
 	log.Fatal(srv.ListenAndServe())

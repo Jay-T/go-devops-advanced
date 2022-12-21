@@ -8,9 +8,11 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -91,6 +93,15 @@ func TestSetMetricOldHandler(t *testing.T) {
 }
 
 func TestGetBody(t *testing.T) {
+	s := Service{
+		Cfg: &Config{
+			Address:       "localhost:8080",
+			StoreInterval: 10,
+			StoreFile:     "file.json",
+			Restore:       true,
+		},
+		Metrics: map[string]Metric{},
+	}
 	tests := []struct {
 		name    string
 		metric  Metric
@@ -127,7 +138,7 @@ func TestGetBody(t *testing.T) {
 			mSer, _ := json.Marshal(tt.metric)
 			request := httptest.NewRequest(http.MethodGet, "http://yandex.ru", bytes.NewBuffer(mSer))
 
-			got, _ := GetBody(request)
+			got, _ := s.GetBody(request)
 			err := request.Body.Close()
 			if err != nil {
 				log.Println(err)
@@ -298,4 +309,26 @@ func BenchmarkGetAllMetricHandler(b *testing.B) {
 			h.ServeHTTP(w, requestGet)
 		}
 	})
+}
+
+func TestStopServer(t *testing.T) {
+	s := &Service{}
+	fakeExit := func(i int) {}
+
+	patch := monkey.Patch(os.Exit, fakeExit)
+	defer patch.Unpatch()
+
+	ctx := context.TODO()
+	ctx, cancel := context.WithCancel(ctx)
+
+	fs := &FileStorageBackuper{
+		filename: "/tmp/test",
+	}
+
+	testFunc := func() int {
+		s.StopServer(ctx, cancel, fs)
+		return 1
+	}
+
+	assert.Equal(t, 1, testFunc())
 }

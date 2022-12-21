@@ -8,7 +8,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -19,7 +18,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/caarlos0/env"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 )
@@ -52,33 +50,6 @@ func (m Metric) GetValueFloat() float64 {
 	return *m.Value
 }
 
-// Config struct describes application config.
-type Config struct {
-	Address        string        `env:"ADDRESS"`
-	ReportInterval time.Duration `env:"REPORT_INTERVAL"`
-	PollInterval   time.Duration `env:"POLL_INTERVAL"`
-	Key            string        `env:"KEY"`
-}
-
-// RewriteConfigWithEnvs rewrites values from ENV variables if same variable is specified as flag.
-func GetConfig() (*Config, error) {
-	c := &Config{}
-
-	flag.StringVar(&c.Address, "a", "localhost:8080", "Address for sending data to")
-	flag.DurationVar(&c.ReportInterval, "r", time.Duration(10*time.Second), "Metric report to server interval")
-	flag.DurationVar(&c.PollInterval, "p", time.Duration(2*time.Second), "Metric poll interval")
-	flag.StringVar(&c.Key, "k", "testkey", "Encryption key")
-	flag.Parse()
-
-	err := env.Parse(c)
-	if err != nil {
-		log.Fatal(err)
-		return nil, err
-	}
-
-	return c, nil
-}
-
 // Data struct describes message format between goroutines
 type Data struct {
 	name         string
@@ -90,7 +61,8 @@ type Data struct {
 type Agent struct {
 	Cfg     *Config
 	Metrics map[string]Metric
-	l       sync.RWMutex
+	sync.RWMutex
+	Encryptor *Encryptor
 }
 
 // NewAgent configures Agent and returns pointer on it.
@@ -103,6 +75,13 @@ func NewAgent() (*Agent, error) {
 	}
 	a.Metrics = map[string]Metric{}
 	a.Cfg = cfg
+
+	if a.Cfg.CryptoKey != "" {
+		a.Encryptor, err = NewEncryptor(a.Cfg.CryptoKey)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	return &a, nil
 }
@@ -134,10 +113,22 @@ func (a *Agent) sendData(m *Metric) error {
 	}
 	url = fmt.Sprintf("http://%s/update/", a.Cfg.Address)
 
+	if a.Encryptor != nil {
+		mSer, err = a.Encryptor.encrypt(mSer)
+		if err != nil {
+			return err
+		}
+	}
+
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(mSer))
 
 	if err != nil {
 		return err
+	}
+
+	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !statusOK {
+		return NewDecryptError(fmt.Sprintf("Non-OK HTTP status: %d", resp.StatusCode))
 	}
 
 	err = resp.Body.Close()
@@ -151,6 +142,7 @@ func (a *Agent) sendData(m *Metric) error {
 func (a *Agent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, syncChan <-chan time.Time) {
 	var rtm runtime.MemStats
 
+	log.Printf("Polling data with interval: %s", a.Cfg.PollInterval)
 	for {
 		select {
 		case <-syncChan:
@@ -233,18 +225,28 @@ func (a *Agent) GetCPUDataByInterval(ctx context.Context, gaugeChan chan<- Data)
 }
 
 func (a *Agent) sendBulkData(mList *[]Metric) error {
-	var url string
-
+	url := fmt.Sprintf("http://%s/updates/", a.Cfg.Address)
 	mSer, err := json.Marshal(*mList)
 	if err != nil {
 		return err
 	}
-	url = fmt.Sprintf("http://%s/updates/", a.Cfg.Address)
+	if a.Encryptor != nil {
+		mSer, err = a.Encryptor.encrypt(mSer)
+		if err != nil {
+			return err
+		}
+	}
+
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(mSer))
 
 	if err != nil {
 		log.Println(err)
 		return err
+	}
+
+	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
+	if !statusOK {
+		return NewDecryptError(fmt.Sprintf("Non-OK HTTP status: %d", resp.StatusCode))
 	}
 
 	err = resp.Body.Close()
@@ -254,35 +256,53 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 	return nil
 }
 
+func (a *Agent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
+	var mList []Metric
+
+	func() {
+		a.Lock()
+		defer a.Unlock()
+
+		for _, m := range a.Metrics {
+			err := a.sendData(&m)
+			if err != nil {
+				log.Printf("metric: %s, error: %s", m.ID, err)
+			}
+			mList = append(mList, m)
+			if m.ID == "PollCount" {
+				PollCount = 0
+			}
+		}
+	}()
+
+	if finFlag {
+		doneChan <- struct{}{}
+	}
+	if PollCount == 0 {
+		dataChan <- Data{name: "PollCount", counterValue: 0}
+	}
+	if len(mList) > 0 {
+		err := a.sendBulkData(&mList)
+		if err != nil {
+			log.Print(err)
+		}
+	}
+}
+
 // SendDataByInterval gorouting sends data to server every specified interval.
-func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data) {
+func (a *Agent) SendDataByInterval(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}) {
+	log.Printf("Sending data with interval: %s", a.Cfg.ReportInterval)
+	log.Printf("Sending data to: %s", a.Cfg.Address)
+
 	ticker := time.NewTicker(a.Cfg.ReportInterval)
 	for {
 		select {
 		case <-ticker.C:
-			var mList []Metric
-			a.l.Lock()
-			for _, m := range a.Metrics {
-				err := a.sendData(&m)
-				if err != nil {
-					log.Printf("metric: %s, error: %s", m.ID, err)
-				}
-				mList = append(mList, m)
-				if m.ID == "PollCount" {
-					PollCount = 0
-				}
-			}
-			a.l.Unlock()
-			if PollCount == 0 {
-				dataChan <- Data{name: "PollCount", counterValue: 0}
-			}
-			if len(mList) > 0 {
-				err := a.sendBulkData(&mList)
-				if err != nil {
-					log.Print(err)
-				}
-			}
+			a.combineAndSend(dataChan, doneChan, false)
 		case <-ctx.Done():
+			log.Println("Received cancel command. Sending processed data.")
+			a.combineAndSend(dataChan, doneChan, true)
+
 			log.Println("Context has been canceled successfully.")
 			return
 		}
@@ -299,35 +319,52 @@ func (a *Agent) RunTicker(ctx context.Context, syncChan chan<- time.Time) {
 			syncChan <- t
 		case <-ctx.Done():
 			log.Println("RunTicker has been canceled successfully.")
+			return
 		}
 	}
 }
 
 // StopAgent stops the application.
-func (a *Agent) StopAgent(sigChan <-chan os.Signal, cancel context.CancelFunc) {
+func (a *Agent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, cancel context.CancelFunc) {
 	<-sigChan
 	log.Println("Receieved a SIGINT! Stopping the agent.")
-
 	cancel()
-	log.Println("Stopped all goroutines.")
 
-	os.Exit(1)
+	ticker := time.NewTicker(3 * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			log.Println("Stopped all goroutines.")
+			os.Exit(1)
+
+		case <-doneChan:
+			log.Println("Stopped all goroutines gracefully.")
+			os.Exit(1)
+		}
+	}
 }
 
 // NewMetric saves new incoming Data from channel to metric map in Metric format.
 func (a *Agent) NewMetric(ctx context.Context, dataChan <-chan Data) {
+	assignValue := func(data Data) {
+		a.Lock()
+		defer a.Unlock()
+		if data.name == "PollCount" {
+			a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
+		} else {
+			a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
+		}
+	}
+
 	for {
 		select {
 		case data := <-dataChan:
-			a.l.Lock()
-			if data.name == "PollCount" {
-				a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
-			} else {
-				a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
-			}
-			a.l.Unlock()
+			assignValue(data)
 		case <-ctx.Done():
+			data := <-dataChan
+			assignValue(data)
 			log.Println("NewMetric has been canceled successfully.")
+			return
 		}
 	}
 }

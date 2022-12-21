@@ -33,6 +33,7 @@ func main() {
 		syscall.SIGQUIT)
 	dataChan := make(chan agent.Data)
 	syncChan := make(chan time.Time)
+	doneChan := make(chan struct{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go a.RunTicker(ctx, syncChan)
@@ -40,6 +41,8 @@ func main() {
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
-	go a.SendDataByInterval(ctx, dataChan)
-	a.StopAgent(sigChan, cancel)
+	go a.SendDataByInterval(ctx, dataChan, doneChan)
+	a.StopAgent(sigChan, doneChan, cancel)
+	// go a.SendDataByInterval(ctx, dataChan)
+	// a.StopAgent(sigChan, cancel)
 }

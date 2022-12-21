@@ -3,6 +3,7 @@ module github.com/Jay-T/go-devops.git
 go 1.16
 
 require (
+	bou.ke/monkey v1.0.2
 	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/blugelabs/bluge v0.2.2
 	github.com/caarlos0/env v3.5.0+incompatible // indirect
