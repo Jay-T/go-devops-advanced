@@ -2,10 +2,12 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/assert"
 )
@@ -122,4 +124,34 @@ func TestSaveMetricToDB(t *testing.T) {
 	mock.ExpectRollback()
 	err = dbs.SaveMetric(ctx, s.Metrics)
 	assert.Error(t, err)
+}
+
+func TestNewBackuper(t *testing.T) {
+	cfg := &Config{
+		DBAddress: "postgress://address.test/?sslmode=disable",
+	}
+	ctx := context.TODO()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	fakeOpen := func(str1 string, str2 string) (*sql.DB, error) {
+		return db, nil
+	}
+	patch := monkey.Patch(sql.Open, fakeOpen)
+	defer patch.Unpatch()
+
+	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS metrics .*`).WillReturnResult(sqlmock.NewResult(1, 1))
+
+	_, err = NewBackuper(ctx, cfg)
+	assert.NoError(t, err)
+
+	cfg = &Config{
+		DBAddress: "",
+		StoreFile: "/tmp/test",
+	}
+
+	_, err = NewBackuper(ctx, cfg)
+	assert.NoError(t, err)
 }

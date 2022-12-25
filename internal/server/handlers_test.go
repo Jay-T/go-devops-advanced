@@ -456,3 +456,68 @@ func TestDecryptHandler(t *testing.T) {
 		})
 	}
 }
+
+func TestTrustedNetworkCheckHandler(t *testing.T) {
+	tests := []struct {
+		name           string
+		trustedSubnet  string
+		requestAddress string
+		expectedCode   int
+	}{
+		{
+			name:           "Test One. Valid request.",
+			trustedSubnet:  "127.0.0.0/8",
+			requestAddress: "127.0.0.1",
+			expectedCode:   200,
+		},
+		{
+			name:           "Test Two. No subnet defined.",
+			trustedSubnet:  "",
+			requestAddress: "127.0.0.1",
+			expectedCode:   200,
+		},
+		{
+			name:           "Test Three. Forbidden address.",
+			trustedSubnet:  "10.0.0.0/8",
+			requestAddress: "127.0.0.1",
+			expectedCode:   403,
+		},
+		{
+			name:           "Test Three. Empty X-Real-Op header.",
+			trustedSubnet:  "10.0.0.0/8",
+			requestAddress: "",
+			expectedCode:   403,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := Service{
+				Cfg: &Config{
+					TrustedSubnet: tt.trustedSubnet,
+				},
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/", nil)
+			if tt.requestAddress != "" {
+				request.Header.Add("X-Real-Ip", tt.requestAddress)
+			}
+
+			w := httptest.NewRecorder()
+			h1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			h0 := http.Handler(s.trustedNetworkCheckHandler(h1))
+
+			h0.ServeHTTP(w, request)
+			res := w.Result()
+
+			assert.Equal(t, tt.expectedCode, res.StatusCode)
+
+			err := res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
+		})
+	}
+}
