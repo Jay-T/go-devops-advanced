@@ -210,13 +210,13 @@ func (s *Service) trustedNetworkCheckHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		reqXRealIp := r.Header.Get("X-Real-Ip")
-		if reqXRealIp == "" {
+		reqXRealIP := r.Header.Get("X-Real-Ip")
+		if reqXRealIP == "" {
 			http.Error(w, "Request does not have X-Real-Ip header.", http.StatusForbidden)
 			return
 		}
 
-		ip := net.ParseIP(reqXRealIp)
+		ip := net.ParseIP(reqXRealIP)
 
 		_, ipV4Net, err := net.ParseCIDR(s.Cfg.TrustedSubnet)
 		if err != nil {
