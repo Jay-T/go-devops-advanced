@@ -8,8 +8,10 @@ import (
 	_ "embed"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 	"text/template"
@@ -197,6 +199,36 @@ func (s *Service) decryptHandler(next http.Handler) http.Handler {
 			}
 			r.Body = io.NopCloser(bytes.NewBuffer(body))
 		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Service) trustedNetworkCheckHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.Cfg.TrustedSubnet == "" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		reqXRealIp := r.Header.Get("X-Real-Ip")
+		if reqXRealIp == "" {
+			http.Error(w, "Request does not have X-Real-Ip header.", http.StatusForbidden)
+			return
+		}
+
+		ip := net.ParseIP(reqXRealIp)
+
+		_, ipV4Net, err := net.ParseCIDR(s.Cfg.TrustedSubnet)
+		if err != nil {
+			log.Print(err)
+			return
+		}
+
+		if !ipV4Net.Contains(ip) {
+			http.Error(w, fmt.Sprintf("Access is forbidden for %s", ip), http.StatusForbidden)
+			return
+		}
+
 		next.ServeHTTP(w, r)
 	})
 }
