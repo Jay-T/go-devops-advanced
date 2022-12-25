@@ -126,6 +126,7 @@ func (s Service) StartRecordInterval(ctx context.Context, backuper StorageBackup
 func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
 	r := chi.NewRouter()
 	// middlewares
+	r.Use(s.trustedNetworkCheckHandler)
 	r.Use(gzipHandle)
 	if s.Decryptor != nil {
 		r.Use(s.decryptHandler)

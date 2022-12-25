@@ -190,6 +190,7 @@ func NewBackuper(ctx context.Context, cfg *Config) (StorageBackuper, error) {
 		dbBackuper.db = db
 		err = dbBackuper.DBInit(ctx)
 		if err != nil {
+			log.Print(dbBackuper.db)
 			return nil, err
 		}
 		backuper = dbBackuper

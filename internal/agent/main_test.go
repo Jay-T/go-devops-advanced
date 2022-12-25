@@ -29,20 +29,17 @@ func Test_SendData(t *testing.T) {
 	tests := []struct {
 		name    string
 		fields  fields
-		client  *http.Client
 		want    bool
 		wantErr bool
 	}{
 		{
 			name:    "test one",
 			fields:  fields{name: "Alloc", typename: gauge, value: 1.5},
-			client:  &http.Client{Timeout: 2 * time.Second},
 			wantErr: false,
 		},
 		{
 			name:    "test two",
 			fields:  fields{name: "PollCounter", typename: counter, delta: 1},
-			client:  &http.Client{Timeout: 2 * time.Second},
 			wantErr: false,
 		},
 	}
@@ -54,6 +51,7 @@ func Test_SendData(t *testing.T) {
 					ReportInterval: 10,
 					PollInterval:   2,
 				},
+				client: &http.Client{Timeout: 2 * time.Second},
 			}
 
 			m := Metric{

@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log"
 	"math/rand"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
@@ -59,10 +60,12 @@ type Data struct {
 
 // Agent struct accepts Config and handles all metrics manipulations.
 type Agent struct {
-	Cfg     *Config
-	Metrics map[string]Metric
 	sync.RWMutex
-	Encryptor *Encryptor
+	Cfg          *Config
+	Metrics      map[string]Metric
+	Encryptor    *Encryptor
+	localAddress string
+	client       *http.Client
 }
 
 // NewAgent configures Agent and returns pointer on it.
@@ -83,6 +86,25 @@ func NewAgent() (*Agent, error) {
 		}
 	}
 
+	if a.Cfg.LocalInterface != "" {
+		iface, err := net.InterfaceByName(cfg.LocalInterface)
+		if err != nil {
+			log.Fatal("Error while getting local interfaces.", err.Error())
+		}
+
+		if iface != nil {
+			addresses, err := iface.Addrs()
+			if err != nil {
+				log.Fatal("Error while getting an address from local interface.", err.Error())
+			}
+			address := addresses[0]
+			if ipnet, ok := address.(*net.IPNet); ok {
+				a.localAddress = ipnet.IP.String()
+			}
+		}
+	}
+
+	a.client = &http.Client{}
 	return &a, nil
 }
 
@@ -120,8 +142,17 @@ func (a *Agent) sendData(m *Metric) error {
 		}
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(mSer))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(mSer))
+	if err != nil {
+		return err
+	}
 
+	req.Header.Add("Content-Type", "application/json")
+	if a.localAddress != "" {
+		req.Header.Add("X-Real-Ip", a.localAddress)
+	}
+
+	resp, err := a.client.Do(req)
 	if err != nil {
 		return err
 	}
@@ -237,8 +268,16 @@ func (a *Agent) sendBulkData(mList *[]Metric) error {
 		}
 	}
 
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(mSer))
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(mSer))
+	if err != nil {
+		return err
+	}
+	req.Header.Add("Content-Type", "application/json")
+	if a.localAddress != "" {
+		req.Header.Add("X-Real-Ip", a.localAddress)
+	}
 
+	resp, err := a.client.Do(req)
 	if err != nil {
 		log.Println(err)
 		return err
