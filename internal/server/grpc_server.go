@@ -4,11 +4,13 @@ import (
 	"context"
 	"crypto/hmac"
 	"encoding/hex"
+	"fmt"
 	"log"
 	"net"
 
 	pb "github.com/Jay-T/go-devops.git/internal/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -30,13 +32,13 @@ func NewGRPCServer(ctx context.Context, cfg *Config, backuper StorageBackuper) (
 }
 
 // StartServer launches HTTP server.
-func (s GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) {
+func (s *GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) {
 	listen, err := net.Listen("tcp", s.Cfg.Address)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	server := grpc.NewServer()
+	server := grpc.NewServer(grpc.ChainUnaryInterceptor(s.checkReqIDInterceptor, s.checkIPInterceptor))
 	pb.RegisterMetricsAgentServer(server, s)
 	reflection.Register(server)
 
@@ -81,7 +83,7 @@ func (s GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) {
 	log.Printf("Finished to serve gRPC requests")
 }
 
-func (s GRPCServer) convertData(m *pb.Metric) (*Metric, error) {
+func (s *GRPCServer) convertData(m *pb.Metric) (*Metric, error) {
 	if m.Mtype == counter {
 		return &Metric{
 			ID:    m.Id,
@@ -98,12 +100,16 @@ func (s GRPCServer) convertData(m *pb.Metric) (*Metric, error) {
 	}, nil
 }
 
-func (s GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequest) (*pb.UpdateMetricResponse, error) {
+func (s *GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequest) (*pb.UpdateMetricResponse, error) {
 	log.Printf("UpdateMetric request: %s", in)
+
+	md, _ := metadata.FromIncomingContext(ctx)
+	reqID := md.Get("Request-ID")[0]
+
 	m, err := s.convertData(in.Metric)
 	if err != nil {
 		return &pb.UpdateMetricResponse{
-			Error: "Could not convert received data",
+			Error: fmt.Sprintf("Could not convert received data. Req-id: %s", reqID),
 		}, nil
 	}
 	var remoteHash []byte
@@ -113,32 +119,32 @@ func (s GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequest
 		remoteHash, err = hex.DecodeString(m.Hash)
 		if err != nil {
 			return &pb.UpdateMetricResponse{
-				Error: "Hash validation error",
+				Error: fmt.Sprintf("Hash validation error. Req-id: %s", reqID),
 			}, nil
 		}
 		if !hmac.Equal(localHash, remoteHash) {
 			return &pb.UpdateMetricResponse{
-				Error: "Hash validation error",
+				Error: fmt.Sprintf("Hash validation error. Req-id: %s", reqID),
 			}, nil
 		}
 	}
 	s.saveMetric(ctx, m)
 
-	// return &pb.UpdateMetricResponse{
-	// 	Error: "DEBUG Received UpdateMetric!",
-	// }, nil
-
 	return &pb.UpdateMetricResponse{}, nil
 }
 
-func (s GRPCServer) UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsRequest) (*pb.UpdateMetricsResponse, error) {
+func (s *GRPCServer) UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsRequest) (*pb.UpdateMetricsResponse, error) {
 	log.Printf("UpdateMetric request: %s", in)
+
+	md, _ := metadata.FromIncomingContext(ctx)
+	reqID := md.Get("Request-ID")[0]
+
 	mList := make([]Metric, 0, 43)
 	for _, i := range in.Metrics {
 		m, err := s.convertData(i)
 		if err != nil {
 			return &pb.UpdateMetricsResponse{
-				Error: "Could not convert received data",
+				Error: fmt.Sprintf("Could not convert received data. Req-id: %s", reqID),
 			}, nil
 		}
 		mList = append(mList, *m)
@@ -147,12 +153,9 @@ func (s GRPCServer) UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsReque
 	err := s.saveListToDB(ctx, &mList)
 	if err != nil {
 		return &pb.UpdateMetricsResponse{
-			Error: "Could not save received data to storage",
+			Error: fmt.Sprintf("Could not save received data to storage. Req-id: %s", reqID),
 		}, nil
 	}
 
 	return &pb.UpdateMetricsResponse{}, nil
-	// return &pb.UpdateMetricsResponse{
-	// 	Error: "DEBUG Received UpdateMetrics!",
-	// }, nil
 }

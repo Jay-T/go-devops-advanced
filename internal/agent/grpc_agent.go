@@ -36,16 +36,22 @@ func NewGRPCAgent(cfg *Config) (*GRPCAgent, error) {
 	if err != nil {
 		return nil, err
 	}
-	conn, err := grpc.Dial(cfg.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	newGRPCAgent := &GRPCAgent{
+		genericAgent,
+		nil,
+		nil,
+	}
+
+	conn, err := grpc.Dial(cfg.Address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUnaryInterceptor(newGRPCAgent.clientInterceptor))
 	if err != nil {
 		return &GRPCAgent{}, err
 	}
 	client := pb.NewMetricsAgentClient(conn)
-	return &GRPCAgent{
-		genericAgent,
-		conn,
-		client,
-	}, nil
+
+	newGRPCAgent.conn = conn
+	newGRPCAgent.client = client
+
+	return newGRPCAgent, nil
 }
 
 // func (a *GRPCAgent) sendData(m *Metric) error {
@@ -114,7 +120,7 @@ func (a *GRPCAgent) convertMetric(m *Metric) *pb.Metric {
 	}
 }
 
-func (a *GRPCAgent) sendData(m *Metric) error {
+func (a *GRPCAgent) sendData(ctx context.Context, m *Metric) error {
 	log.Printf("Sending! %v+", m)
 
 	pbMetric := a.convertMetric(m)
@@ -123,7 +129,7 @@ func (a *GRPCAgent) sendData(m *Metric) error {
 		Metric: pbMetric,
 	}
 
-	res, err := a.client.UpdateMetric(context.Background(), req)
+	res, err := a.client.UpdateMetric(ctx, req)
 	if err != nil {
 		log.Printf("Error during sendData, %s", err)
 		return err
@@ -136,7 +142,7 @@ func (a *GRPCAgent) sendData(m *Metric) error {
 	return nil
 }
 
-func (a *GRPCAgent) sendBulkData(mList *[]Metric) error {
+func (a *GRPCAgent) sendBulkData(ctx context.Context, mList *[]Metric) error {
 	log.Println("Sending bulk!")
 	var pbMetrics []*pb.Metric
 
@@ -148,7 +154,7 @@ func (a *GRPCAgent) sendBulkData(mList *[]Metric) error {
 		Metrics: pbMetrics,
 	}
 
-	res, err := a.client.UpdateMetrics(context.Background(), req)
+	res, err := a.client.UpdateMetrics(ctx, req)
 	if err != nil {
 		log.Printf("Error during sendData, %s", err)
 		return err
@@ -161,7 +167,7 @@ func (a *GRPCAgent) sendBulkData(mList *[]Metric) error {
 	return nil
 }
 
-func (a *GRPCAgent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
+func (a *GRPCAgent) combineAndSend(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
 	var mList []Metric
 
 	func() {
@@ -169,7 +175,7 @@ func (a *GRPCAgent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{
 		defer a.Unlock()
 
 		for _, m := range a.Metrics {
-			err := a.sendData(&m)
+			err := a.sendData(ctx, &m)
 			if err != nil {
 				log.Printf("metric: %s, error: %s", m.ID, err)
 			}
@@ -187,7 +193,7 @@ func (a *GRPCAgent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{
 		dataChan <- Data{name: "PollCount", counterValue: 0}
 	}
 	if len(mList) > 0 {
-		err := a.sendBulkData(&mList)
+		err := a.sendBulkData(ctx, &mList)
 		if err != nil {
 			log.Print(err)
 		}
@@ -203,10 +209,10 @@ func (a *GRPCAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data
 	for {
 		select {
 		case <-ticker.C:
-			a.combineAndSend(dataChan, doneChan, false)
+			a.combineAndSend(ctx, dataChan, doneChan, false)
 		case <-ctx.Done():
 			log.Println("Received cancel command. Sending processed data.")
-			a.combineAndSend(dataChan, doneChan, true)
+			a.combineAndSend(ctx, dataChan, doneChan, true)
 
 			log.Println("Context has been canceled successfully.")
 			return
