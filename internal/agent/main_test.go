@@ -45,13 +45,15 @@ func Test_SendData(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := Agent{
-				Cfg: &Config{
-					Address:        "localhost:8080",
-					ReportInterval: 10,
-					PollInterval:   2,
+			a := HTTPAgent{
+				&GenericAgent{
+					Cfg: &Config{
+						Address:        "localhost:8080",
+						ReportInterval: 10,
+						PollInterval:   2,
+					},
 				},
-				client: &http.Client{Timeout: 2 * time.Second},
+				&http.Client{Timeout: 2 * time.Second},
 			}
 
 			m := Metric{
@@ -114,12 +116,15 @@ func Test_SendDataOld(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := Agent{
-				Cfg: &Config{
-					Address:        "localhost:8080",
-					ReportInterval: 10,
-					PollInterval:   2,
+			a := HTTPAgent{
+				&GenericAgent{
+					Cfg: &Config{
+						Address:        "localhost:8080",
+						ReportInterval: 10,
+						PollInterval:   2,
+					},
 				},
+				&http.Client{},
 			}
 
 			m := Metric{

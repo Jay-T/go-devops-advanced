@@ -40,6 +40,7 @@ type Config struct {
 	CryptoKey      string        `env:"CRYPTO_KEY"`
 	ConfigFile     string        `env:"CONFIG"`
 	LocalInterface string        `env:"LOCAL_INTERFACE"`
+	GRPC           bool
 }
 
 type ConfigFile struct {
@@ -129,6 +130,7 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&c.LocalInterface, "intf", defaultLocalInterface, "Local network interface")
 	flag.StringVar(&c.ConfigFile, "config", "", "Config file name")
 	flag.StringVar(&c.ConfigFile, "c", "", "Config file name")
+	flag.BoolVar(&c.GRPC, "grpc", false, "Run as gRPC service")
 	flag.Parse()
 	flag.Usage = func() { fmt.Print(usage) }
 	flag.Parse()

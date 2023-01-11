@@ -62,14 +62,16 @@ func TestSetMetricOldHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Service{
-				Cfg: &Config{
-					Address:       "localhost:8080",
-					StoreInterval: 10,
-					StoreFile:     "file.json",
-					Restore:       true,
+			s := HTTPServer{
+				&GenericService{
+					Cfg: &Config{
+						Address:       "localhost:8080",
+						StoreInterval: 10,
+						StoreFile:     "file.json",
+						Restore:       true,
+					},
+					Metrics: map[string]Metric{},
 				},
-				Metrics: map[string]Metric{},
 			}
 			request := httptest.NewRequest(http.MethodPost, tt.requestURL, nil)
 			w := httptest.NewRecorder()
@@ -93,14 +95,16 @@ func TestSetMetricOldHandler(t *testing.T) {
 }
 
 func TestGetBody(t *testing.T) {
-	s := Service{
-		Cfg: &Config{
-			Address:       "localhost:8080",
-			StoreInterval: 10,
-			StoreFile:     "file.json",
-			Restore:       true,
+	s := HTTPServer{
+		&GenericService{
+			Cfg: &Config{
+				Address:       "localhost:8080",
+				StoreInterval: 10,
+				StoreFile:     "file.json",
+				Restore:       true,
+			},
+			Metrics: map[string]Metric{},
 		},
-		Metrics: map[string]Metric{},
 	}
 	tests := []struct {
 		name    string
@@ -152,10 +156,12 @@ func TestStartServer(t *testing.T) {
 	fs := &FileStorageBackuper{
 		filename: "/tmp/test",
 	}
-	s := Service{
-		Metrics: map[string]Metric{},
-		Cfg: &Config{
-			Address: "localhost:8080",
+	s := HTTPServer{
+		&GenericService{
+			Metrics: map[string]Metric{},
+			Cfg: &Config{
+				Address: "localhost:8080",
+			},
 		},
 	}
 
@@ -226,14 +232,16 @@ func TestNewService(t *testing.T) {
 }
 
 func BenchmarkSetMetricHandler(b *testing.B) {
-	s := Service{
-		Cfg: &Config{
-			Address:       "localhost:8080",
-			StoreInterval: 10,
-			StoreFile:     "file.json",
-			Restore:       true,
+	s := HTTPServer{
+		&GenericService{
+			Cfg: &Config{
+				Address:       "localhost:8080",
+				StoreInterval: 10,
+				StoreFile:     "file.json",
+				Restore:       true,
+			},
+			Metrics: map[string]Metric{},
 		},
-		Metrics: map[string]Metric{},
 	}
 	// triesN := 1
 
@@ -291,14 +299,16 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 }
 
 func BenchmarkGetAllMetricHandler(b *testing.B) {
-	s := Service{
-		Cfg: &Config{
-			Address:       "localhost:8080",
-			StoreInterval: 10,
-			StoreFile:     "file.json",
-			Restore:       true,
+	s := HTTPServer{
+		&GenericService{
+			Cfg: &Config{
+				Address:       "localhost:8080",
+				StoreInterval: 10,
+				StoreFile:     "file.json",
+				Restore:       true,
+			},
+			Metrics: map[string]Metric{},
 		},
-		Metrics: map[string]Metric{},
 	}
 
 	w := httptest.NewRecorder()
@@ -312,7 +322,7 @@ func BenchmarkGetAllMetricHandler(b *testing.B) {
 }
 
 func TestStopServer(t *testing.T) {
-	s := &Service{}
+	s := &GenericService{}
 	fakeExit := func(i int) {}
 
 	patch := monkey.Patch(os.Exit, fakeExit)

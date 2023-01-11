@@ -54,7 +54,7 @@ func TestSaveListToDB(t *testing.T) {
 		},
 	}
 
-	s := Service{
+	s := GenericService{
 		Metrics: map[string]Metric{},
 	}
 

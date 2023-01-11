@@ -5,16 +5,11 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	_ "github.com/lib/pq"
 )
 
@@ -33,15 +28,15 @@ type Metric struct {
 }
 
 // Service structure. Holds application config and db connector.
-type Service struct {
+type GenericService struct {
 	Cfg       *Config
 	Metrics   map[string]Metric
 	Decryptor *Decryptor
 }
 
 // NewService returns Service with config parsed from flags or ENV vars.
-func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Service, error) {
-	var s Service
+func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*GenericService, error) {
+	var s GenericService
 	var err error
 
 	s.Metrics = map[string]Metric{}
@@ -71,22 +66,7 @@ func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Se
 	return &s, nil
 }
 
-// GetBody parses HTTP request's body and returns Metric.
-func (s *Service) GetBody(r *http.Request) (*Metric, error) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	m := &Metric{}
-	err = json.Unmarshal(body, m)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (s Service) saveMetric(ctx context.Context, backuper StorageBackuper, m *Metric) {
+func (s GenericService) saveMetric(ctx context.Context, backuper StorageBackuper, m *Metric) {
 	switch m.MType {
 	case counter:
 		if s.Metrics[m.ID].Delta == nil {
@@ -106,7 +86,7 @@ func (s Service) saveMetric(ctx context.Context, backuper StorageBackuper, m *Me
 }
 
 // StartRecordInterval preiodically saves metrics.
-func (s Service) StartRecordInterval(ctx context.Context, backuper StorageBackuper) {
+func (s GenericService) StartRecordInterval(ctx context.Context, backuper StorageBackuper) {
 	ticker := time.NewTicker(s.Cfg.StoreInterval)
 	for {
 		select {
@@ -122,41 +102,8 @@ func (s Service) StartRecordInterval(ctx context.Context, backuper StorageBackup
 	}
 }
 
-// StartServer launches HTTP server.
-func (s Service) StartServer(ctx context.Context, backuper StorageBackuper) {
-	r := chi.NewRouter()
-	// middlewares
-	r.Use(s.trustedNetworkCheckHandler)
-	r.Use(gzipHandle)
-	if s.Decryptor != nil {
-		r.Use(s.decryptHandler)
-	}
-	r.Mount("/debug", middleware.Profiler())
-	// old methods
-	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
-	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
-	r.Post("/update/*", NotImplemented)
-	r.Post("/update/{metricName}/", NotFound)
-	r.Get("/value/*", s.GetMetricOldHandler)
-	r.Get("/", s.GetAllMetricHandler)
-	// new methods
-	r.Post("/update/", s.SetMetricHandler(ctx, backuper))
-	r.Post("/updates/", s.SetMetricListHandler(ctx, backuper))
-	r.Post("/value/", s.GetMetricHandler)
-	r.Get("/ping", backuper.CheckStorageStatus)
-
-	srv := &http.Server{
-		Addr:    s.Cfg.Address,
-		Handler: r,
-	}
-
-	srv.SetKeepAlivesEnabled(false)
-	log.Printf("Listening socket: %s", s.Cfg.Address)
-	log.Fatal(srv.ListenAndServe())
-}
-
 // GenerateHash generates sha256 hash for http request's body fields for message validation.
-func (s Service) GenerateHash(m *Metric) []byte {
+func (s GenericService) GenerateHash(m *Metric) []byte {
 	var data string
 
 	h := hmac.New(sha256.New, []byte(s.Cfg.Key))
@@ -171,7 +118,7 @@ func (s Service) GenerateHash(m *Metric) []byte {
 }
 
 // CloseApp closes http application.
-func (s Service) StopServer(ctx context.Context, cancel context.CancelFunc, backuper StorageBackuper) {
+func (s GenericService) StopServer(ctx context.Context, cancel context.CancelFunc, backuper StorageBackuper) {
 	log.Println("Received a SIGINT! Stopping application")
 	err := backuper.SaveMetric(ctx, s.Metrics)
 	if err != nil {

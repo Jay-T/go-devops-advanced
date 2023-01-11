@@ -56,7 +56,7 @@ func TestRestoreMetrics(t *testing.T) {
 		db: db,
 	}
 
-	s := Service{
+	s := GenericService{
 		Metrics: map[string]Metric{},
 	}
 
@@ -95,7 +95,7 @@ func TestSaveMetricToDB(t *testing.T) {
 		db: db,
 	}
 
-	s := Service{
+	s := GenericService{
 		Metrics: map[string]Metric{},
 	}
 

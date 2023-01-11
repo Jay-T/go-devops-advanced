@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func ExampleService_GetAllMetricHandler() {
+func ExampleHTTPServer_GetAllMetricHandler() {
 	url := "http://localhost:8080/"
 
 	resp, err := http.Get(url)
@@ -22,7 +22,7 @@ func ExampleService_GetAllMetricHandler() {
 	}
 }
 
-func ExampleService_SetMetricHandler() {
+func ExampleHTTPServer_SetMetricHandler() {
 	m := &Metric{}
 
 	mSer, err := json.Marshal(m)
@@ -42,7 +42,7 @@ func ExampleService_SetMetricHandler() {
 	}
 }
 
-func ExampleService_SetMetricListHandler() {
+func ExampleHTTPServer_SetMetricListHandler() {
 	m := &[]Metric{}
 
 	mSer, err := json.Marshal(m)
@@ -62,7 +62,7 @@ func ExampleService_SetMetricListHandler() {
 	}
 }
 
-func ExampleService_GetMetricHandler() {
+func ExampleHTTPServer_GetMetricHandler() {
 	m := &Metric{}
 
 	mSer, err := json.Marshal(m)
@@ -82,7 +82,7 @@ func ExampleService_GetMetricHandler() {
 	}
 }
 
-func ExampleService_SetMetricOldHandler() {
+func ExampleHTTPServer_SetMetricOldHandler() {
 	metricName := "Alloc"
 	metricValue := 0.2345
 
@@ -98,7 +98,7 @@ func ExampleService_SetMetricOldHandler() {
 	}
 }
 
-func ExampleService_SetMetricOldHandler_second() {
+func ExampleHTTPServer_SetMetricOldHandler_second() {
 	metricName := "PollCount"
 	metricValue := 2
 
@@ -114,7 +114,7 @@ func ExampleService_SetMetricOldHandler_second() {
 	}
 }
 
-func ExampleService_GetMetricOldHandler() {
+func ExampleHTTPServer_GetMetricOldHandler() {
 	metricName := "PollCount"
 
 	url := fmt.Sprintf("http://localhost:8080/value/%s", metricName)

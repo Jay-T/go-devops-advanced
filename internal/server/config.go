@@ -47,6 +47,7 @@ type Config struct {
 	CryptoKey     string        `env:"CRYPTO_KEY"`
 	ConfigFile    string        `env:"CONFIG"`
 	TrustedSubnet string        `env:"TRUSTED_SUBNET"`
+	GRPC          bool
 }
 
 type ConfigFile struct {
@@ -145,6 +146,7 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&c.TrustedSubnet, "t", defaultTrustedSubnet, "Trusted subnet")
 	flag.StringVar(&c.ConfigFile, "config", defaultConfig, "Config file name")
 	flag.StringVar(&c.ConfigFile, "c", defaultConfig, "Config file name")
+	flag.BoolVar(&c.GRPC, "grpc", false, "Run as gRPC service")
 	flag.Usage = func() { fmt.Print(usage) }
 	flag.Parse()
 

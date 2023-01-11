@@ -22,7 +22,7 @@ var htmlPage []byte
 
 // GetAllMetricHandler returns HTML page with all metrics values.
 // URI: "/".
-func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
+func (s HTTPServer) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 	var floatVal float64
 	dataMap := map[string]float64{}
 
@@ -45,7 +45,7 @@ func (s Service) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) {
 
 // SetMetricHandler saves metric from HTTP POST request.
 // URI: "/update/".
-func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
+func (s HTTPServer) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := s.GetBody(r)
 		var remoteHash []byte
@@ -78,7 +78,7 @@ func (s Service) SetMetricHandler(ctx context.Context, backuper StorageBackuper)
 
 // SetMetricListHandler saves a list of metrics from HTTP POST request.
 // URI: "/updates/".
-func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
+func (s HTTPServer) SetMetricListHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 
@@ -104,7 +104,7 @@ func (s Service) SetMetricListHandler(ctx context.Context, backuper StorageBacku
 
 // GetMetricHandler returns a metric which was specified in HTTP POST request.
 // URI: "/value/".
-func (s Service) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
+func (s HTTPServer) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	m, err := s.GetBody(r)
 	if err != nil {
 		http.Error(w, "Internal error during JSON unmarshal", http.StatusInternalServerError)
@@ -183,7 +183,7 @@ func gzipHandle(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Service) decryptHandler(next http.Handler) http.Handler {
+func (s *HTTPServer) decryptHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -203,7 +203,7 @@ func (s *Service) decryptHandler(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Service) trustedNetworkCheckHandler(next http.Handler) http.Handler {
+func (s *HTTPServer) trustedNetworkCheckHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if s.Cfg.TrustedSubnet == "" {
 			next.ServeHTTP(w, r)

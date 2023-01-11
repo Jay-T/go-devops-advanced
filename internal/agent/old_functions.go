@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func (a *Agent) sendDataOld(m *Metric) error {
+func (a *HTTPAgent) sendDataOld(m *Metric) error {
 	var url string
 	switch m.MType {
 	case gauge:

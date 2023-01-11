@@ -34,19 +34,21 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s, err := server.NewService(ctx, cfg, backuper)
-	if err != nil {
-		log.Fatalf("Could not load server config. Error: %s", err)
-	}
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
-	go s.StartServer(ctx, backuper)
-
-	<-sigChan
-	s.StopServer(ctx, cancel, backuper)
+	if cfg.GRPC {
+		fmt.Println("GRPC SERVICE")
+	} else {
+		HTTPServer, err := server.NewHTTPService(ctx, cfg, backuper)
+		if err != nil {
+			log.Fatalf("Could not run HTTP server. Error: %s", err)
+		}
+		go HTTPServer.StartServer(ctx, backuper)
+		<-sigChan
+		HTTPServer.StopServer(ctx, cancel, backuper)
+	}
 }
