@@ -5,7 +5,7 @@ import (
 	"database/sql"
 )
 
-func (s *GenericService) saveListToDB(ctx context.Context, mList *[]Metric, backuper StorageBackuper) error {
+func (s *GenericService) saveListToDB(ctx context.Context, mList *[]Metric) error {
 	for _, m := range *mList {
 		switch m.MType {
 		case counter:
@@ -18,7 +18,7 @@ func (s *GenericService) saveListToDB(ctx context.Context, mList *[]Metric, back
 			s.Metrics[m.ID] = m
 		}
 	}
-	if err := backuper.SaveMetric(ctx, s.Metrics); err != nil {
+	if err := s.backuper.SaveMetric(ctx, s.Metrics); err != nil {
 		return err
 	}
 	return nil

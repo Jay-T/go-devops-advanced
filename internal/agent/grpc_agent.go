@@ -8,12 +8,44 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Jay-T/go-devops.git/internal/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
+
+type GRPCRequestError struct {
+	msg string
+}
+
+func (e *GRPCRequestError) Error() string {
+	return e.msg
+}
+
+func NewGRPCRequestError(text string) error {
+	return &GRPCRequestError{msg: text}
+}
 
 type GRPCAgent struct {
 	*GenericAgent
-	conn *grpc.ClientConn
+	conn   *grpc.ClientConn
+	client pb.MetricsAgentClient
+}
+
+func NewGRPCAgent(cfg *Config) (*GRPCAgent, error) {
+	genericAgent, err := NewGenericAgent(cfg)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := grpc.Dial(cfg.Address, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return &GRPCAgent{}, err
+	}
+	client := pb.NewMetricsAgentClient(conn)
+	return &GRPCAgent{
+		genericAgent,
+		conn,
+		client,
+	}, nil
 }
 
 // func (a *GRPCAgent) sendData(m *Metric) error {
@@ -62,11 +94,70 @@ type GRPCAgent struct {
 // 	return nil
 // }
 
+func (a *GRPCAgent) convertMetric(m *Metric) *pb.Metric {
+	if a.Cfg.Key != "" {
+		a.AddHash(m)
+	}
+	if m.MType == counter {
+		return &pb.Metric{
+			Id:    m.ID,
+			Mtype: m.MType,
+			Delta: *m.Delta,
+			Hash:  m.Hash,
+		}
+	}
+	return &pb.Metric{
+		Id:    m.ID,
+		Mtype: m.MType,
+		Value: *m.Value,
+		Hash:  m.Hash,
+	}
+}
+
 func (a *GRPCAgent) sendData(m *Metric) error {
+	log.Printf("Sending! %v+", m)
+
+	pbMetric := a.convertMetric(m)
+
+	req := &pb.UpdateMetricRequest{
+		Metric: pbMetric,
+	}
+
+	res, err := a.client.UpdateMetric(context.Background(), req)
+	if err != nil {
+		log.Printf("Error during sendData, %s", err)
+		return err
+	}
+
+	if res.Error != "" {
+		log.Printf("server rejected metric: %s", res.Error)
+		return NewGRPCRequestError(res.Error)
+	}
 	return nil
 }
 
 func (a *GRPCAgent) sendBulkData(mList *[]Metric) error {
+	log.Println("Sending bulk!")
+	var pbMetrics []*pb.Metric
+
+	for _, m := range *mList {
+		pbMetrics = append(pbMetrics, a.convertMetric(&m))
+	}
+
+	req := &pb.UpdateMetricsRequest{
+		Metrics: pbMetrics,
+	}
+
+	res, err := a.client.UpdateMetrics(context.Background(), req)
+	if err != nil {
+		log.Printf("Error during sendData, %s", err)
+		return err
+	}
+
+	if res.Error != "" {
+		log.Printf("server rejected metric: %s", res.Error)
+		return NewGRPCRequestError(res.Error)
+	}
 	return nil
 }
 
@@ -139,6 +230,6 @@ func (a *GRPCAgent) Run() {
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
-	// go a.SendDataByInterval(ctx, dataChan, doneChan)
+	go a.SendDataByInterval(ctx, dataChan, doneChan)
 	a.StopAgent(sigChan, doneChan, cancel)
 }

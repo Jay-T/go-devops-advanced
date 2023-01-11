@@ -32,6 +32,7 @@ type GenericService struct {
 	Cfg       *Config
 	Metrics   map[string]Metric
 	Decryptor *Decryptor
+	backuper  StorageBackuper
 }
 
 // NewService returns Service with config parsed from flags or ENV vars.
@@ -63,10 +64,11 @@ func NewService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*Ge
 		log.Print("Crypto is enabled")
 	}
 
+	s.backuper = backuper
 	return &s, nil
 }
 
-func (s GenericService) saveMetric(ctx context.Context, backuper StorageBackuper, m *Metric) {
+func (s GenericService) saveMetric(ctx context.Context, m *Metric) {
 	switch m.MType {
 	case counter:
 		if s.Metrics[m.ID].Delta == nil {
@@ -79,7 +81,7 @@ func (s GenericService) saveMetric(ctx context.Context, backuper StorageBackuper
 	default:
 		log.Printf("Metric type '%s' is not expected. Skipping.", m.MType)
 	}
-	err := backuper.SaveMetric(ctx, s.Metrics)
+	err := s.backuper.SaveMetric(ctx, s.Metrics)
 	if err != nil {
 		log.Print(err)
 	}

@@ -71,16 +71,16 @@ func TestSetMetricOldHandler(t *testing.T) {
 						Restore:       true,
 					},
 					Metrics: map[string]Metric{},
+					backuper: &FileStorageBackuper{
+						filename: "/tmp/test",
+					},
 				},
 			}
 			request := httptest.NewRequest(http.MethodPost, tt.requestURL, nil)
 			w := httptest.NewRecorder()
 
-			fs := &FileStorageBackuper{
-				filename: "/tmp/test",
-			}
 			ctx := context.TODO()
-			h := http.HandlerFunc(s.SetMetricOldHandler(ctx, fs))
+			h := http.HandlerFunc(s.SetMetricOldHandler(ctx))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -241,6 +241,9 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 				Restore:       true,
 			},
 			Metrics: map[string]Metric{},
+			backuper: &FileStorageBackuper{
+				filename: "/tmp/test",
+			},
 		},
 	}
 	// triesN := 1
@@ -256,12 +259,9 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 	w := httptest.NewRecorder()
 
 	ctx := context.TODO()
-	fs := &FileStorageBackuper{
-		filename: "/tmp/test",
-	}
 
 	requestPost := httptest.NewRequest(http.MethodPost, "/update/", bytes.NewBuffer(mSer))
-	h := http.HandlerFunc(s.SetMetricHandler(ctx, fs))
+	h := http.HandlerFunc(s.SetMetricHandler(ctx))
 	b.ResetTimer()
 	b.Run("SetMetricHandler", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -270,7 +270,7 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 	})
 
 	requestPost = httptest.NewRequest(http.MethodPost, "/updates/", bytes.NewBuffer(mSer))
-	h = http.HandlerFunc(s.SetMetricListHandler(ctx, fs))
+	h = http.HandlerFunc(s.SetMetricListHandler(ctx))
 	b.ResetTimer()
 	b.Run("SetMetricListHandler", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -279,7 +279,7 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 	})
 
 	requestPost = httptest.NewRequest(http.MethodPost, "/update/gauge/Alloc/2", nil)
-	h = http.HandlerFunc(s.SetMetricOldHandler(ctx, fs))
+	h = http.HandlerFunc(s.SetMetricOldHandler(ctx))
 	b.ResetTimer()
 	b.Run("SetMetricOldHandlerGauge", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
@@ -288,7 +288,7 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 	})
 
 	requestPost = httptest.NewRequest(http.MethodPost, "/update/counter/PollCount/2", nil)
-	h = http.HandlerFunc(s.SetMetricOldHandler(ctx, fs))
+	h = http.HandlerFunc(s.SetMetricOldHandler(ctx))
 	b.ResetTimer()
 	b.Run("SetMetricOldHandlerCounter", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {

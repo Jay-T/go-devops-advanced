@@ -41,7 +41,13 @@ func main() {
 		syscall.SIGQUIT)
 
 	if cfg.GRPC {
-		fmt.Println("GRPC SERVICE")
+		GRPCServer, err := server.NewGRPCServer(ctx, cfg, backuper)
+		if err != nil {
+			log.Fatalf("Could not run GRPC server. Error: %s", err)
+		}
+		go GRPCServer.StartServer(ctx, backuper)
+		<-sigChan
+		GRPCServer.StopServer(ctx, cancel, backuper)
 	} else {
 		HTTPServer, err := server.NewHTTPService(ctx, cfg, backuper)
 		if err != nil {

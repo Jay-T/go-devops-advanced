@@ -45,7 +45,7 @@ func (s HTTPServer) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) 
 
 // SetMetricHandler saves metric from HTTP POST request.
 // URI: "/update/".
-func (s HTTPServer) SetMetricHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
+func (s HTTPServer) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		m, err := s.GetBody(r)
 		var remoteHash []byte
@@ -67,7 +67,7 @@ func (s HTTPServer) SetMetricHandler(ctx context.Context, backuper StorageBackup
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		s.saveMetric(ctx, backuper, m)
+		s.saveMetric(ctx, m)
 		w.WriteHeader(http.StatusOK)
 		err = r.Body.Close()
 		if err != nil {
@@ -78,7 +78,7 @@ func (s HTTPServer) SetMetricHandler(ctx context.Context, backuper StorageBackup
 
 // SetMetricListHandler saves a list of metrics from HTTP POST request.
 // URI: "/updates/".
-func (s HTTPServer) SetMetricListHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
+func (s HTTPServer) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 
@@ -91,7 +91,7 @@ func (s HTTPServer) SetMetricListHandler(ctx context.Context, backuper StorageBa
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
 			return
 		}
-		err = s.saveListToDB(ctx, &m, backuper)
+		err = s.saveListToDB(ctx, &m)
 		if err != nil {
 			log.Print(err)
 		}

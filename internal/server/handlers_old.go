@@ -14,7 +14,7 @@ import (
 // URI: "/update/gcounter/{metricName}/{metricValue}".
 //
 // Deprecated: use SetMetricHandler instead.
-func (s HTTPServer) SetMetricOldHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
+func (s HTTPServer) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var m Metric
 
@@ -49,7 +49,7 @@ func (s HTTPServer) SetMetricOldHandler(ctx context.Context, backuper StorageBac
 			log.Printf("Metric type '%s' is not expected. Skipping.", mType)
 		}
 		w.WriteHeader(http.StatusOK)
-		s.saveMetric(ctx, backuper, &m)
+		s.saveMetric(ctx, &m)
 	})
 }
 

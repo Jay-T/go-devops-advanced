@@ -64,6 +64,9 @@ func TestSetMetricHandler(t *testing.T) {
 						Key:           "testkey",
 					},
 					Metrics: map[string]Metric{},
+					backuper: &FileStorageBackuper{
+						filename: "/tmp/test",
+					},
 				},
 			}
 
@@ -73,10 +76,7 @@ func TestSetMetricHandler(t *testing.T) {
 
 			ctx := context.TODO()
 
-			fs := &FileStorageBackuper{
-				filename: "/tmp/test",
-			}
-			h := http.HandlerFunc(s.SetMetricHandler(ctx, fs))
+			h := http.HandlerFunc(s.SetMetricHandler(ctx))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -205,11 +205,10 @@ func TestSetMetricListHandler(t *testing.T) {
 	s := HTTPServer{
 		&GenericService{
 			Metrics: map[string]Metric{},
+			backuper: &DBStorageBackuper{
+				db: db,
+			},
 		},
-	}
-
-	dbs := &DBStorageBackuper{
-		db: db,
 	}
 
 	tests := []struct {
@@ -259,7 +258,7 @@ func TestSetMetricListHandler(t *testing.T) {
 			mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectCommit()
 
-			h := http.HandlerFunc(s.SetMetricListHandler(ctx, dbs))
+			h := http.HandlerFunc(s.SetMetricListHandler(ctx))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()

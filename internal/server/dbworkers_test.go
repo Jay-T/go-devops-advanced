@@ -55,7 +55,8 @@ func TestSaveListToDB(t *testing.T) {
 	}
 
 	s := GenericService{
-		Metrics: map[string]Metric{},
+		Metrics:  map[string]Metric{},
+		backuper: dbs,
 	}
 
 	mock.ExpectBegin()
@@ -64,14 +65,14 @@ func TestSaveListToDB(t *testing.T) {
 		stmt.ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 	}
 	mock.ExpectCommit()
-	err = s.saveListToDB(ctx, &mList, dbs)
+	err = s.saveListToDB(ctx, &mList)
 	assert.NoError(t, err)
 
 	mock.ExpectBegin()
 	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().WillReturnError(New("TestError"))
 	mock.ExpectRollback()
 
-	err = s.saveListToDB(ctx, &mList, dbs)
+	err = s.saveListToDB(ctx, &mList)
 	assert.Error(t, err)
 }
 

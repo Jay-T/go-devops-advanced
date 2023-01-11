@@ -23,12 +23,11 @@ func main() {
 		log.Fatal("Error while getting config.", err.Error())
 	}
 	if cfg.GRPC {
-		// a, err := agent.NewGRPCAgent(cfg)
-		// if err != nil {
-		// 	log.Fatal(fmt.Errorf("failed to create HTTP agent: %w", err))
-		// }
-		fmt.Println("GRPC SERVER")
-
+		a, err := agent.NewGRPCAgent(cfg)
+		if err != nil {
+			log.Fatal(fmt.Errorf("failed to create gRPC agent: %w", err))
+		}
+		a.Run()
 	} else {
 		a, err := agent.NewHTTPAgent(cfg)
 		if err != nil {
@@ -36,22 +35,4 @@ func main() {
 		}
 		a.Run()
 	}
-
-	// sigChan := make(chan os.Signal, 1)
-	// signal.Notify(sigChan,
-	// 	syscall.SIGINT,
-	// 	syscall.SIGTERM,
-	// 	syscall.SIGQUIT)
-	// dataChan := make(chan agent.Data)
-	// syncChan := make(chan time.Time)
-	// doneChan := make(chan struct{})
-
-	// ctx, cancel := context.WithCancel(context.Background())
-	// go a.RunTicker(ctx, syncChan)
-	// go a.NewMetric(ctx, dataChan)
-	// go a.GetDataByInterval(ctx, dataChan, syncChan)
-	// go a.GetMemDataByInterval(ctx, dataChan, syncChan)
-	// go a.GetCPUDataByInterval(ctx, dataChan)
-	// go a.SendDataByInterval(ctx, dataChan, doneChan)
-	// a.StopAgent(sigChan, doneChan, cancel)
 }

@@ -43,6 +43,7 @@ func (s *HTTPServer) GetBody(r *http.Request) (*Metric, error) {
 
 // StartServer launches HTTP server.
 func (s HTTPServer) StartServer(ctx context.Context, backuper StorageBackuper) {
+	log.Println("Starting HTTP server")
 	r := chi.NewRouter()
 	// middlewares
 	r.Use(s.trustedNetworkCheckHandler)
@@ -52,15 +53,15 @@ func (s HTTPServer) StartServer(ctx context.Context, backuper StorageBackuper) {
 	}
 	r.Mount("/debug", middleware.Profiler())
 	// old methods
-	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
-	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
+	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
+	r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))
 	r.Post("/update/*", NotImplemented)
 	r.Post("/update/{metricName}/", NotFound)
 	r.Get("/value/*", s.GetMetricOldHandler)
 	r.Get("/", s.GetAllMetricHandler)
 	// new methods
-	r.Post("/update/", s.SetMetricHandler(ctx, backuper))
-	r.Post("/updates/", s.SetMetricListHandler(ctx, backuper))
+	r.Post("/update/", s.SetMetricHandler(ctx))
+	r.Post("/updates/", s.SetMetricListHandler(ctx))
 	r.Post("/value/", s.GetMetricHandler)
 	r.Get("/ping", backuper.CheckStorageStatus)
 
