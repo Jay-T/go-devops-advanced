@@ -69,10 +69,6 @@ func NewGenericAgent(cfg *Config) (*GenericAgent, error) {
 	var a GenericAgent
 	var err error
 
-	// cfg, err := GetConfig()
-	// if err != nil {
-	// 	log.Fatal("Error while getting config.", err.Error())
-	// }
 	a.Metrics = map[string]Metric{}
 	a.Cfg = cfg
 

@@ -11,10 +11,12 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
+// HTTPServer struct describes HTTP server based on GenericService.
 type HTTPServer struct {
 	*GenericService
 }
 
+// NewHTTPService returns new HTTPServer.
 func NewHTTPService(ctx context.Context, cfg *Config, backuper StorageBackuper) (*HTTPServer, error) {
 	genericService, err := NewService(ctx, cfg, backuper)
 	if err != nil {

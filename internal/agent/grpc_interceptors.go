@@ -8,6 +8,7 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
+// clientInterceptor adds Request-ID and X-Real-Ip (if needed) to request metadata
 func (a *GRPCAgent) clientInterceptor(ctx context.Context, method string, req interface{},
 	reply interface{}, cc *grpc.ClientConn, invoker grpc.UnaryInvoker,
 	opts ...grpc.CallOption) error {

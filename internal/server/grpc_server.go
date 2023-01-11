@@ -14,11 +14,13 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
+// GRPCServer struct describes GRPC server based on GenericService.
 type GRPCServer struct {
 	*GenericService
 	pb.UnimplementedMetricsAgentServer
 }
 
+// NewGRPCServer returns new GRPCServer.
 func NewGRPCServer(ctx context.Context, cfg *Config, backuper StorageBackuper) (*GRPCServer, error) {
 	genericService, err := NewService(ctx, cfg, backuper)
 	if err != nil {
@@ -31,7 +33,7 @@ func NewGRPCServer(ctx context.Context, cfg *Config, backuper StorageBackuper) (
 	}, nil
 }
 
-// StartServer launches HTTP server.
+// StartServer launches GRPC server.
 func (s *GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) {
 	listen, err := net.Listen("tcp", s.Cfg.Address)
 	if err != nil {
@@ -48,36 +50,6 @@ func (s *GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) 
 			log.Fatal(err)
 		}
 	}()
-
-	// r := chi.NewRouter()
-	// // middlewares
-	// r.Use(s.trustedNetworkCheckHandler)
-	// r.Use(gzipHandle)
-	// if s.Decryptor != nil {
-	// 	r.Use(s.decryptHandler)
-	// }
-	// r.Mount("/debug", middleware.Profiler())
-	// // old methods
-	// r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
-	// r.Post("/update/counter/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx, backuper))
-	// r.Post("/update/*", NotImplemented)
-	// r.Post("/update/{metricName}/", NotFound)
-	// r.Get("/value/*", s.GetMetricOldHandler)
-	// r.Get("/", s.GetAllMetricHandler)
-	// // new methods
-	// r.Post("/update/", s.SetMetricHandler(ctx, backuper))
-	// r.Post("/updates/", s.SetMetricListHandler(ctx, backuper))
-	// r.Post("/value/", s.GetMetricHandler)
-	// r.Get("/ping", backuper.CheckStorageStatus)
-
-	// srv := &http.Server{
-	// 	Addr:    s.Cfg.Address,
-	// 	Handler: r,
-	// }
-
-	// srv.SetKeepAlivesEnabled(false)
-	// log.Printf("Listening socket: %s", s.Cfg.Address)
-	// log.Fatal(srv.ListenAndServe())
 
 	<-ctx.Done()
 	log.Printf("Finished to serve gRPC requests")
@@ -100,9 +72,8 @@ func (s *GRPCServer) convertData(m *pb.Metric) (*Metric, error) {
 	}, nil
 }
 
+// UpdateMetric receives a Metric from client and updates it in storage.
 func (s *GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequest) (*pb.UpdateMetricResponse, error) {
-	log.Printf("UpdateMetric request: %s", in)
-
 	md, _ := metadata.FromIncomingContext(ctx)
 	reqID := md.Get("Request-ID")[0]
 
@@ -133,9 +104,8 @@ func (s *GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricReques
 	return &pb.UpdateMetricResponse{}, nil
 }
 
+// UpdateMetrics receives a slice of Metric from client and updates these metrics in storage.
 func (s *GRPCServer) UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsRequest) (*pb.UpdateMetricsResponse, error) {
-	log.Printf("UpdateMetric request: %s", in)
-
 	md, _ := metadata.FromIncomingContext(ctx)
 	reqID := md.Get("Request-ID")[0]
 

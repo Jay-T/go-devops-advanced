@@ -9,11 +9,13 @@ import (
 	"os"
 )
 
+// Decryptor struct contains decryption key.
 type Decryptor struct {
 	privateKey *rsa.PrivateKey
 	decrypted  []byte
 }
 
+// NewDecryptor returns a Decryptor.
 func NewDecryptor(privateKeyFile string) (*Decryptor, error) {
 	file, err := os.ReadFile(privateKeyFile)
 	if err != nil {

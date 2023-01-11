@@ -25,12 +25,14 @@ func NewGRPCRequestError(text string) error {
 	return &GRPCRequestError{msg: text}
 }
 
+// GRPCAgent struct describes format of GRPC agent based on GenericAgent.
 type GRPCAgent struct {
 	*GenericAgent
 	conn   *grpc.ClientConn
 	client pb.MetricsAgentClient
 }
 
+// NewGRPCAgent returns GRPCAgent for work.
 func NewGRPCAgent(cfg *Config) (*GRPCAgent, error) {
 	genericAgent, err := NewGenericAgent(cfg)
 	if err != nil {
@@ -54,52 +56,6 @@ func NewGRPCAgent(cfg *Config) (*GRPCAgent, error) {
 	return newGRPCAgent, nil
 }
 
-// func (a *GRPCAgent) sendData(m *Metric) error {
-// 	var url string
-// 	if a.Cfg.Key != "" {
-// 		a.AddHash(m)
-// 	}
-
-// 	mSer, err := json.Marshal(*m)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	url = fmt.Sprintf("http://%s/update/", a.Cfg.Address)
-
-// 	if a.Encryptor != nil {
-// 		mSer, err = a.Encryptor.encrypt(mSer)
-// 		if err != nil {
-// 			return err
-// 		}
-// 	}
-
-// 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(mSer))
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	req.Header.Add("Content-Type", "application/json")
-// 	if a.localAddress != "" {
-// 		req.Header.Add("X-Real-Ip", a.localAddress)
-// 	}
-
-// 	resp, err := a.client.Do(req)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	statusOK := resp.StatusCode >= 200 && resp.StatusCode < 300
-// 	if !statusOK {
-// 		return NewDecryptError(fmt.Sprintf("Non-OK HTTP status: %d", resp.StatusCode))
-// 	}
-
-// 	err = resp.Body.Close()
-// 	if err != nil {
-// 		return err
-// 	}
-// 	return nil
-// }
-
 func (a *GRPCAgent) convertMetric(m *Metric) *pb.Metric {
 	if a.Cfg.Key != "" {
 		a.AddHash(m)
@@ -121,8 +77,6 @@ func (a *GRPCAgent) convertMetric(m *Metric) *pb.Metric {
 }
 
 func (a *GRPCAgent) sendData(ctx context.Context, m *Metric) error {
-	log.Printf("Sending! %v+", m)
-
 	pbMetric := a.convertMetric(m)
 
 	req := &pb.UpdateMetricRequest{
@@ -143,7 +97,6 @@ func (a *GRPCAgent) sendData(ctx context.Context, m *Metric) error {
 }
 
 func (a *GRPCAgent) sendBulkData(ctx context.Context, mList *[]Metric) error {
-	log.Println("Sending bulk!")
 	var pbMetrics []*pb.Metric
 
 	for _, m := range *mList {
@@ -220,6 +173,7 @@ func (a *GRPCAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data
 	}
 }
 
+// Run begins the agent work.
 func (a *GRPCAgent) Run() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,

@@ -13,11 +13,13 @@ import (
 	"time"
 )
 
+// HTTPAgent struct describes format of HTTP agent based on GenericAgent.
 type HTTPAgent struct {
 	*GenericAgent
 	client *http.Client
 }
 
+// NewHTTPAgent returns HTTPAgent for work.
 func NewHTTPAgent(cfg *Config) (*HTTPAgent, error) {
 	genericAgent, err := NewGenericAgent(cfg)
 	if err != nil {
@@ -170,6 +172,7 @@ func (a *HTTPAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data
 	}
 }
 
+// Run begins the agent work.
 func (a *HTTPAgent) Run() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,
