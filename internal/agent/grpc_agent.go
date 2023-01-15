@@ -129,7 +129,7 @@ func (a *GRPCAgent) combineAndSend(ctx context.Context, dataChan chan<- Data, do
 }
 
 // SendDataByInterval gorouting sends data to server every specified interval.
-func (a *GRPCAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}) {
+func (a *GRPCAgent) SendGRPCDataByInterval(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}) {
 	log.Printf("Sending data with interval: %s", a.Cfg.ReportInterval)
 	log.Printf("Sending data to: %s", a.Cfg.Address)
 
@@ -150,16 +150,6 @@ func (a *GRPCAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data
 
 // Run begins the agent work.
 func (a *GRPCAgent) Run(ctx context.Context, doneChan chan<- struct{}) {
-	dataChan := make(chan Data)
-	syncChan := make(chan time.Time)
-
-	// GenericAgent methods
-	go a.RunTicker(ctx, syncChan)
-	go a.NewMetric(ctx, dataChan)
-	go a.GetDataByInterval(ctx, dataChan, syncChan)
-	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
-	go a.GetCPUDataByInterval(ctx, dataChan)
-
-	// GRPCAgent method
-	go a.SendDataByInterval(ctx, dataChan, doneChan)
+	dataChan := a.runCommonAgentGoroutines(ctx)
+	go a.SendGRPCDataByInterval(ctx, dataChan, doneChan)
 }

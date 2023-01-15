@@ -94,6 +94,19 @@ func NewGenericAgent(cfg *Config) (*GenericAgent, error) {
 	return &a, nil
 }
 
+func (a *GenericAgent) runCommonAgentGoroutines(ctx context.Context) chan Data {
+	dataChan := make(chan Data)
+	syncChan := make(chan time.Time)
+
+	go a.RunTicker(ctx, syncChan)
+	go a.NewMetric(ctx, dataChan)
+	go a.GetDataByInterval(ctx, dataChan, syncChan)
+	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
+	go a.GetCPUDataByInterval(ctx, dataChan)
+
+	return dataChan
+}
+
 // GetDataByInterval gouroutine polls memory metrics each time it receives signal from syncChan.
 func (a *GenericAgent) GetDataByInterval(ctx context.Context, dataChan chan<- Data, syncChan <-chan time.Time) {
 	var rtm runtime.MemStats
