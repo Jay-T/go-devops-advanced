@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -56,7 +57,7 @@ func Test_SendData(t *testing.T) {
 				&http.Client{Timeout: 2 * time.Second},
 			}
 
-			m := Metric{
+			m := metric.Metric{
 				ID:    tt.fields.name,
 				MType: tt.fields.typename,
 				Value: &tt.fields.value,
@@ -127,7 +128,7 @@ func Test_SendDataOld(t *testing.T) {
 				&http.Client{},
 			}
 
-			m := Metric{
+			m := metric.Metric{
 				ID:    tt.fields.name,
 				MType: tt.fields.typename,
 				Value: &tt.fields.value,

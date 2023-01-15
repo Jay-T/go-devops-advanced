@@ -40,21 +40,11 @@ func main() {
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
-	if cfg.GRPC {
-		GRPCServer, err := server.NewGRPCServer(ctx, cfg, backuper)
-		if err != nil {
-			log.Fatalf("Could not run GRPC server. Error: %s", err)
-		}
-		go GRPCServer.StartServer(ctx, backuper)
-		<-sigChan
-		GRPCServer.StopServer(ctx, cancel, backuper)
-	} else {
-		HTTPServer, err := server.NewHTTPService(ctx, cfg, backuper)
-		if err != nil {
-			log.Fatalf("Could not run HTTP server. Error: %s", err)
-		}
-		go HTTPServer.StartServer(ctx, backuper)
-		<-sigChan
-		HTTPServer.StopServer(ctx, cancel, backuper)
+	s, err := server.NewServer(ctx, cfg, backuper)
+	if err != nil {
+		log.Fatalf("Could not run GRPC server. Error: %s", err)
 	}
+	go s.StartServer(ctx, backuper)
+	<-sigChan
+	s.StopServer(ctx, cancel, backuper)
 }

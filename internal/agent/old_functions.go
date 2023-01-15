@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
-func (a *HTTPAgent) sendDataOld(m *Metric) error {
+func (a *HTTPAgent) sendDataOld(m *metric.Metric) error {
 	var url string
 	switch m.MType {
 	case gauge:

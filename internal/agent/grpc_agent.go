@@ -3,12 +3,10 @@ package agent
 import (
 	"context"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/Jay-T/go-devops.git/internal/pb"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -38,46 +36,23 @@ func NewGRPCAgent(cfg *Config) (*GRPCAgent, error) {
 	if err != nil {
 		return nil, err
 	}
-	newGRPCAgent := &GRPCAgent{
-		genericAgent,
-		nil,
-		nil,
+	interceptor := getClientInterceptor(genericAgent.localAddress)
+	conn, err := grpc.Dial(cfg.Address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUnaryInterceptor(interceptor))
+	if err != nil {
+		return nil, err
 	}
 
-	conn, err := grpc.Dial(cfg.Address, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithUnaryInterceptor(newGRPCAgent.clientInterceptor))
-	if err != nil {
-		return &GRPCAgent{}, err
-	}
 	client := pb.NewMetricsAgentClient(conn)
 
-	newGRPCAgent.conn = conn
-	newGRPCAgent.client = client
-
-	return newGRPCAgent, nil
+	return &GRPCAgent{
+		genericAgent,
+		conn,
+		client,
+	}, nil
 }
 
-func (a *GRPCAgent) convertMetric(m *Metric) *pb.Metric {
-	if a.Cfg.Key != "" {
-		a.AddHash(m)
-	}
-	if m.MType == counter {
-		return &pb.Metric{
-			Id:    m.ID,
-			Mtype: m.MType,
-			Delta: *m.Delta,
-			Hash:  m.Hash,
-		}
-	}
-	return &pb.Metric{
-		Id:    m.ID,
-		Mtype: m.MType,
-		Value: *m.Value,
-		Hash:  m.Hash,
-	}
-}
-
-func (a *GRPCAgent) sendData(ctx context.Context, m *Metric) error {
-	pbMetric := a.convertMetric(m)
+func (a *GRPCAgent) sendData(ctx context.Context, m *metric.Metric) error {
+	pbMetric := m.ConvertMetricToPB(a.Cfg.Key)
 
 	req := &pb.UpdateMetricRequest{
 		Metric: pbMetric,
@@ -96,11 +71,11 @@ func (a *GRPCAgent) sendData(ctx context.Context, m *Metric) error {
 	return nil
 }
 
-func (a *GRPCAgent) sendBulkData(ctx context.Context, mList *[]Metric) error {
+func (a *GRPCAgent) sendBulkData(ctx context.Context, mList *[]metric.Metric) error {
 	var pbMetrics []*pb.Metric
 
 	for _, m := range *mList {
-		pbMetrics = append(pbMetrics, a.convertMetric(&m))
+		pbMetrics = append(pbMetrics, m.ConvertMetricToPB(a.Cfg.Key))
 	}
 
 	req := &pb.UpdateMetricsRequest{
@@ -121,7 +96,7 @@ func (a *GRPCAgent) sendBulkData(ctx context.Context, mList *[]Metric) error {
 }
 
 func (a *GRPCAgent) combineAndSend(ctx context.Context, dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
-	var mList []Metric
+	var mList []metric.Metric
 
 	func() {
 		a.Lock()
@@ -174,22 +149,14 @@ func (a *GRPCAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data
 }
 
 // Run begins the agent work.
-func (a *GRPCAgent) Run() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
+func (a *GRPCAgent) Run(ctx context.Context, doneChan chan<- struct{}) {
 	dataChan := make(chan Data)
 	syncChan := make(chan time.Time)
-	doneChan := make(chan struct{})
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go a.RunTicker(ctx, syncChan)
 	go a.NewMetric(ctx, dataChan)
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
 	go a.SendDataByInterval(ctx, dataChan, doneChan)
-	a.StopAgent(sigChan, doneChan, cancel)
 }

@@ -13,10 +13,6 @@ import (
 )
 
 func (s *GRPCServer) checkIPInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-	if s.Cfg.TrustedSubnet == "" {
-		return handler(ctx, req)
-	}
-
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
 		return nil, status.Error(codes.NotFound, "Not MD found when expected")
@@ -30,13 +26,8 @@ func (s *GRPCServer) checkIPInterceptor(ctx context.Context, req interface{}, in
 	reqXRealIP := reqXRealIPList[0]
 	ip := net.ParseIP(reqXRealIP)
 
-	_, ipV4Net, err := net.ParseCIDR(s.Cfg.TrustedSubnet)
-	if err != nil {
-		log.Print(err)
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Could not parse CIDR from X-Real-Ip MD. Req-ID: %s", reqID))
-	}
-
-	if !ipV4Net.Contains(ip) {
+	log.Println(ip.String())
+	if !s.trustedSubnet.Contains(ip) {
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("X-Real-Ip is not trusted. Aborting request. Req-ID: %s", reqID))
 	}
 

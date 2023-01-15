@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 func ExampleHTTPServer_GetAllMetricHandler() {
@@ -23,7 +25,7 @@ func ExampleHTTPServer_GetAllMetricHandler() {
 }
 
 func ExampleHTTPServer_SetMetricHandler() {
-	m := &Metric{}
+	m := &metric.Metric{}
 
 	mSer, err := json.Marshal(m)
 	if err != nil {
@@ -43,7 +45,7 @@ func ExampleHTTPServer_SetMetricHandler() {
 }
 
 func ExampleHTTPServer_SetMetricListHandler() {
-	m := &[]Metric{}
+	m := &[]metric.Metric{}
 
 	mSer, err := json.Marshal(m)
 	if err != nil {
@@ -63,7 +65,7 @@ func ExampleHTTPServer_SetMetricListHandler() {
 }
 
 func ExampleHTTPServer_GetMetricHandler() {
-	m := &Metric{}
+	m := &metric.Metric{}
 
 	mSer, err := json.Marshal(m)
 	if err != nil {

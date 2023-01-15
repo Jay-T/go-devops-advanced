@@ -9,6 +9,7 @@ import (
 
 	"bou.ke/monkey"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,7 +58,7 @@ func TestRestoreMetrics(t *testing.T) {
 	}
 
 	s := GenericService{
-		Metrics: map[string]Metric{},
+		Metrics: map[string]metric.Metric{},
 	}
 
 	rs := sqlmock.NewRows([]string{"id", "mtype", "delta", "value"}).AddRow("Alloc", "gauge", "0", "23456")
@@ -70,7 +71,7 @@ func TestRestoreMetrics(t *testing.T) {
 	if err != nil {
 		log.Print(err)
 	}
-	assert.Equal(t, s.Metrics["Alloc"], Metric{
+	assert.Equal(t, s.Metrics["Alloc"], metric.Metric{
 		ID:    "Alloc",
 		MType: gauge,
 		Delta: getIntPointer(0),
@@ -96,10 +97,10 @@ func TestSaveMetricToDB(t *testing.T) {
 	}
 
 	s := GenericService{
-		Metrics: map[string]Metric{},
+		Metrics: map[string]metric.Metric{},
 	}
 
-	s.Metrics = map[string]Metric{
+	s.Metrics = map[string]metric.Metric{
 		"Alloc": {
 			ID:    "Alloc",
 			MType: gauge,

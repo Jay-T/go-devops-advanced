@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 // HTTPAgent struct describes format of HTTP agent based on GenericAgent.
@@ -33,16 +32,10 @@ func NewHTTPAgent(cfg *Config) (*HTTPAgent, error) {
 
 }
 
-func (a *HTTPAgent) sendData(m *Metric) error {
+func (a *HTTPAgent) sendData(m *metric.Metric) error {
 	var url string
-	if a.Cfg.Key != "" {
-		a.AddHash(m)
-	}
+	mSer, err := m.PrepareMetricAsJSON(a.Cfg.Key)
 
-	mSer, err := json.Marshal(*m)
-	if err != nil {
-		return err
-	}
 	url = fmt.Sprintf("http://%s/update/", a.Cfg.Address)
 
 	if a.Encryptor != nil {
@@ -79,7 +72,7 @@ func (a *HTTPAgent) sendData(m *Metric) error {
 	return nil
 }
 
-func (a *HTTPAgent) sendBulkData(mList *[]Metric) error {
+func (a *HTTPAgent) sendBulkData(mList *[]metric.Metric) error {
 	url := fmt.Sprintf("http://%s/updates/", a.Cfg.Address)
 	mSer, err := json.Marshal(*mList)
 	if err != nil {
@@ -120,7 +113,7 @@ func (a *HTTPAgent) sendBulkData(mList *[]Metric) error {
 }
 
 func (a *HTTPAgent) combineAndSend(dataChan chan<- Data, doneChan chan<- struct{}, finFlag bool) {
-	var mList []Metric
+	var mList []metric.Metric
 
 	func() {
 		a.Lock()
@@ -173,22 +166,14 @@ func (a *HTTPAgent) SendDataByInterval(ctx context.Context, dataChan chan<- Data
 }
 
 // Run begins the agent work.
-func (a *HTTPAgent) Run() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
+func (a *HTTPAgent) Run(ctx context.Context, doneChan chan<- struct{}) {
 	dataChan := make(chan Data)
 	syncChan := make(chan time.Time)
-	doneChan := make(chan struct{})
 
-	ctx, cancel := context.WithCancel(context.Background())
 	go a.RunTicker(ctx, syncChan)
 	go a.NewMetric(ctx, dataChan)
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
 	go a.SendDataByInterval(ctx, dataChan, doneChan)
-	a.StopAgent(sigChan, doneChan, cancel)
 }

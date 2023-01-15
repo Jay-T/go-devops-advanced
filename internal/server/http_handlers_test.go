@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -63,7 +65,7 @@ func TestSetMetricHandler(t *testing.T) {
 						Restore:       true,
 						Key:           "testkey",
 					},
-					Metrics: map[string]Metric{},
+					Metrics: map[string]metric.Metric{},
 					backuper: &FileStorageBackuper{
 						filename: "/tmp/test",
 					},
@@ -93,12 +95,12 @@ func TestSetMetricHandler(t *testing.T) {
 func TestGetMetricHandler(t *testing.T) {
 	tests := []struct {
 		name     string
-		metric   Metric
+		metric   metric.Metric
 		wantCode int
 	}{
 		{
 			name: "Test One",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -108,7 +110,7 @@ func TestGetMetricHandler(t *testing.T) {
 		},
 		{
 			name: "Test Two",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "NoMetric",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -128,7 +130,7 @@ func TestGetMetricHandler(t *testing.T) {
 						Restore:       true,
 						Key:           "testkey",
 					},
-					Metrics: map[string]Metric{},
+					Metrics: map[string]metric.Metric{},
 				},
 			}
 
@@ -154,12 +156,12 @@ func TestGetMetricHandler(t *testing.T) {
 func TestGenerateHash(t *testing.T) {
 	tests := []struct {
 		name   string
-		metric Metric
+		metric metric.Metric
 		want   []byte
 	}{
 		{
 			name: "Test One",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -179,10 +181,10 @@ func TestGenerateHash(t *testing.T) {
 						Restore:       true,
 						Key:           "testkey",
 					},
-					Metrics: map[string]Metric{},
+					Metrics: map[string]metric.Metric{},
 				},
 			}
-			res := s.GenerateHash(&tt.metric)
+			res := tt.metric.GenerateHash(s.Cfg.Key)
 
 			assert.Equal(t, tt.want, res)
 		})
@@ -204,7 +206,7 @@ func TestSetMetricListHandler(t *testing.T) {
 
 	s := HTTPServer{
 		&GenericService{
-			Metrics: map[string]Metric{},
+			Metrics: map[string]metric.Metric{},
 			backuper: &DBStorageBackuper{
 				db: db,
 			},
@@ -213,13 +215,13 @@ func TestSetMetricListHandler(t *testing.T) {
 
 	tests := []struct {
 		name string
-		ml   []Metric
-		m    Metric
+		ml   []metric.Metric
+		m    metric.Metric
 		want int
 	}{
 		{
 			name: "Test One",
-			ml: []Metric{
+			ml: []metric.Metric{
 				{
 					ID:    "Alloc",
 					MType: gauge,
@@ -227,13 +229,13 @@ func TestSetMetricListHandler(t *testing.T) {
 					Hash:  "a2bc398d457f8e417dce8776440f230519f0ee5e2a0cf96130cc631272a9987b",
 				},
 			},
-			m:    Metric{},
+			m:    metric.Metric{},
 			want: 200,
 		},
 		{
 			name: "Test Two",
-			ml:   []Metric{},
-			m: Metric{
+			ml:   []metric.Metric{},
+			m: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -322,7 +324,7 @@ func NewDelta(n int64) *int64 {
 func TestGetMetricOldHandler(t *testing.T) {
 	s := HTTPServer{
 		&GenericService{
-			Metrics: map[string]Metric{
+			Metrics: map[string]metric.Metric{
 				"PollCount": {
 					ID:    "PollCount",
 					MType: counter,
@@ -482,12 +484,6 @@ func TestTrustedNetworkCheckHandler(t *testing.T) {
 			expectedCode:   200,
 		},
 		{
-			name:           "Test Two. No subnet defined.",
-			trustedSubnet:  "",
-			requestAddress: "127.0.0.1",
-			expectedCode:   200,
-		},
-		{
 			name:           "Test Three. Forbidden address.",
 			trustedSubnet:  "10.0.0.0/8",
 			requestAddress: "127.0.0.1",
@@ -502,11 +498,13 @@ func TestTrustedNetworkCheckHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			_, ipV4Net, _ := net.ParseCIDR(tt.trustedSubnet)
 			s := HTTPServer{
 				&GenericService{
 					Cfg: &Config{
 						TrustedSubnet: tt.trustedSubnet,
 					},
+					trustedSubnet: ipV4Net,
 				},
 			}
 

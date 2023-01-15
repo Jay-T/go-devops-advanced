@@ -3,19 +3,17 @@ package agent
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"log"
 	"math/rand"
-	"net"
 	_ "net/http/pprof"
 	"os"
 	"runtime"
 	"sync"
 	"time"
 
+	"github.com/Jay-T/go-devops.git/internal/utils/helpers"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 )
@@ -29,25 +27,6 @@ var (
 	PollCount int64
 )
 
-// Metric struct describes format of metric messages.
-type Metric struct {
-	ID    string   `json:"id"`              // metric's name
-	MType string   `json:"type"`            // parameter taking value of gauge or counter
-	Delta *int64   `json:"delta,omitempty"` // metric value in case of MType == counter
-	Value *float64 `json:"value,omitempty"` // metric value in case of MType == gauge
-	Hash  string   `json:"hash,omitempty"`  // hash value
-}
-
-// GetValueInt returns pointer to int64 value.
-func (m Metric) GetValueInt() int64 {
-	return int64(*m.Delta)
-}
-
-// GetValueFloat returns pointer to float64 value.
-func (m Metric) GetValueFloat() float64 {
-	return *m.Value
-}
-
 // Data struct describes message format between goroutines
 type Data struct {
 	name         string
@@ -55,21 +34,49 @@ type Data struct {
 	counterValue int64
 }
 
-// Agent struct accepts Config and handles all metrics manipulations.
+// Agent interface for both HTTP and gRPC implementation.
+type Agent interface {
+	Run(ctx context.Context, doneChan chan<- struct{})
+	StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, cancel context.CancelFunc)
+}
+
+// NewAgent returns a gRPC or HTTP agent depending on config GRPC flag.
+func NewAgent(cfg *Config) (Agent, error) {
+	if cfg.GRPC {
+		log.Printf("Running agent in gRPC mode.")
+		a, err := NewGRPCAgent(cfg)
+		if err != nil {
+			log.Printf("failed to create gRPC agent: %s", err)
+			return nil, err
+		}
+		return a, nil
+	}
+
+	log.Printf("Running agent in HTTP mode.")
+	a, err := NewHTTPAgent(cfg)
+	if err != nil {
+
+		log.Printf("failed to create HTTP agent: %s", err)
+		return nil, err
+	}
+	return a, nil
+}
+
+// GenericAgent struct accepts Config and handles all metrics manipulations.
 type GenericAgent struct {
 	sync.RWMutex
 	Cfg          *Config
-	Metrics      map[string]Metric
+	Metrics      map[string]metric.Metric
 	Encryptor    *Encryptor
 	localAddress string
 }
 
-// NewAgent configures Agent and returns pointer on it.
+// NewAgent configures GenericAgent and returns pointer on it.
 func NewGenericAgent(cfg *Config) (*GenericAgent, error) {
 	var a GenericAgent
 	var err error
 
-	a.Metrics = map[string]Metric{}
+	a.Metrics = map[string]metric.Metric{}
 	a.Cfg = cfg
 
 	if a.Cfg.CryptoKey != "" {
@@ -79,40 +86,12 @@ func NewGenericAgent(cfg *Config) (*GenericAgent, error) {
 		}
 	}
 
-	if a.Cfg.LocalInterface != "" {
-		iface, err := net.InterfaceByName(cfg.LocalInterface)
-		if err != nil {
-			log.Fatal("Error while getting local interfaces.", err.Error())
-		}
-
-		if iface != nil {
-			addresses, err := iface.Addrs()
-			if err != nil {
-				log.Fatal("Error while getting an address from local interface.", err.Error())
-			}
-			address := addresses[0]
-			if ipnet, ok := address.(*net.IPNet); ok {
-				a.localAddress = ipnet.IP.String()
-			}
-		}
+	a.localAddress, err = helpers.GetLocalInterfaceAddress(a.Cfg.Address)
+	if err != nil {
+		return nil, err
 	}
 
 	return &a, nil
-}
-
-// AddHash computes hash for Metric fields for validation before sending it to server.
-func (a *GenericAgent) AddHash(m *Metric) {
-	var data string
-
-	h := hmac.New(sha256.New, []byte(a.Cfg.Key))
-	switch m.MType {
-	case gauge:
-		data = fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value)
-	case counter:
-		data = fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta)
-	}
-	h.Write([]byte(data))
-	m.Hash = hex.EncodeToString(h.Sum(nil))
 }
 
 // GetDataByInterval gouroutine polls memory metrics each time it receives signal from syncChan.
@@ -218,7 +197,6 @@ func (a *GenericAgent) RunTicker(ctx context.Context, syncChan chan<- time.Time)
 
 // StopAgent stops the application.
 func (a *GenericAgent) StopAgent(sigChan <-chan os.Signal, doneChan <-chan struct{}, cancel context.CancelFunc) {
-	<-sigChan
 	log.Println("Receieved a SIGINT! Stopping the agent.")
 	cancel()
 
@@ -242,9 +220,9 @@ func (a *GenericAgent) NewMetric(ctx context.Context, dataChan <-chan Data) {
 		a.Lock()
 		defer a.Unlock()
 		if data.name == "PollCount" {
-			a.Metrics[data.name] = Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
+			a.Metrics[data.name] = metric.Metric{ID: data.name, MType: counter, Delta: &data.counterValue}
 		} else {
-			a.Metrics[data.name] = Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
+			a.Metrics[data.name] = metric.Metric{ID: data.name, MType: gauge, Value: &data.gaugeValue}
 		}
 	}
 

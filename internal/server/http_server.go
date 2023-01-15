@@ -2,8 +2,6 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"log"
 	"net/http"
 
@@ -28,31 +26,23 @@ func NewHTTPService(ctx context.Context, cfg *Config, backuper StorageBackuper) 
 	}, nil
 }
 
-// GetBody parses HTTP request's body and returns Metric.
-func (s *HTTPServer) GetBody(r *http.Request) (*Metric, error) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	m := &Metric{}
-	err = json.Unmarshal(body, m)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 // StartServer launches HTTP server.
 func (s HTTPServer) StartServer(ctx context.Context, backuper StorageBackuper) {
 	log.Println("Starting HTTP server")
 	r := chi.NewRouter()
 	// middlewares
-	r.Use(s.trustedNetworkCheckHandler)
-	r.Use(gzipHandle)
-	if s.Decryptor != nil {
-		r.Use(s.decryptHandler)
+	middlewares := []func(http.Handler) http.Handler{
+		gzipHandle,
 	}
+	if s.Cfg.TrustedSubnet != "" {
+		middlewares = append(middlewares, s.trustedNetworkCheckHandler)
+	}
+	if s.Decryptor != nil {
+		middlewares = append(middlewares, s.decryptHandler)
+	}
+
+	r.Use(middlewares...)
+
 	r.Mount("/debug", middleware.Profiler())
 	// old methods
 	r.Post("/update/gauge/{metricName}/{metricValue}", s.SetMetricOldHandler(ctx))

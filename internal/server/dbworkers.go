@@ -3,9 +3,11 @@ package server
 import (
 	"context"
 	"database/sql"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
-func (s *GenericService) saveListToDB(ctx context.Context, mList *[]Metric) error {
+func (s *GenericService) saveListToDB(ctx context.Context, mList *[]metric.Metric) error {
 	for _, m := range *mList {
 		switch m.MType {
 		case counter:

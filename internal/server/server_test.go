@@ -14,6 +14,8 @@ import (
 
 	"bou.ke/monkey"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/converter"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -70,7 +72,7 @@ func TestSetMetricOldHandler(t *testing.T) {
 						StoreFile:     "file.json",
 						Restore:       true,
 					},
-					Metrics: map[string]Metric{},
+					Metrics: map[string]metric.Metric{},
 					backuper: &FileStorageBackuper{
 						filename: "/tmp/test",
 					},
@@ -95,27 +97,16 @@ func TestSetMetricOldHandler(t *testing.T) {
 }
 
 func TestGetBody(t *testing.T) {
-	s := HTTPServer{
-		&GenericService{
-			Cfg: &Config{
-				Address:       "localhost:8080",
-				StoreInterval: 10,
-				StoreFile:     "file.json",
-				Restore:       true,
-			},
-			Metrics: map[string]Metric{},
-		},
-	}
 	tests := []struct {
 		name    string
-		metric  Metric
+		metric  metric.Metric
 		want    string
 		want2   string
 		wantErr bool
 	}{
 		{
 			name: "One",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(1.5),
@@ -126,7 +117,7 @@ func TestGetBody(t *testing.T) {
 		},
 		{
 			name: "Two",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "PollCount",
 				MType: counter,
 				Delta: getIntPointer(4),
@@ -142,7 +133,7 @@ func TestGetBody(t *testing.T) {
 			mSer, _ := json.Marshal(tt.metric)
 			request := httptest.NewRequest(http.MethodGet, "http://yandex.ru", bytes.NewBuffer(mSer))
 
-			got, _ := s.GetBody(request)
+			got, _ := converter.GetBody(request)
 			err := request.Body.Close()
 			if err != nil {
 				log.Println(err)
@@ -158,7 +149,7 @@ func TestStartServer(t *testing.T) {
 	}
 	s := HTTPServer{
 		&GenericService{
-			Metrics: map[string]Metric{},
+			Metrics: map[string]metric.Metric{},
 			Cfg: &Config{
 				Address: "localhost:8080",
 			},
@@ -240,7 +231,7 @@ func BenchmarkSetMetricHandler(b *testing.B) {
 				StoreFile:     "file.json",
 				Restore:       true,
 			},
-			Metrics: map[string]Metric{},
+			Metrics: map[string]metric.Metric{},
 			backuper: &FileStorageBackuper{
 				filename: "/tmp/test",
 			},
@@ -307,7 +298,7 @@ func BenchmarkGetAllMetricHandler(b *testing.B) {
 				StoreFile:     "file.json",
 				Restore:       true,
 			},
-			Metrics: map[string]Metric{},
+			Metrics: map[string]metric.Metric{},
 		},
 	}
 

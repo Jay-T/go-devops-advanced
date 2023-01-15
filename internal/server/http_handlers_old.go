@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 // SetMetricOldHandler - an old handler that receives metrics in URI.
@@ -16,7 +18,7 @@ import (
 // Deprecated: use SetMetricHandler instead.
 func (s HTTPServer) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var m Metric
+		var m metric.Metric
 
 		mType := strings.Split(r.RequestURI, "/")[2]
 		mName := strings.Split(r.RequestURI, "/")[3]
@@ -29,7 +31,7 @@ func (s HTTPServer) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 				http.Error(w, "parsing error. Bad request", http.StatusBadRequest)
 				return
 			}
-			m = Metric{
+			m = metric.Metric{
 				ID:    mName,
 				MType: mType,
 				Value: &val,
@@ -40,7 +42,7 @@ func (s HTTPServer) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 				http.Error(w, "parsing error. Bad request", http.StatusBadRequest)
 				return
 			}
-			m = Metric{
+			m = metric.Metric{
 				ID:    mName,
 				MType: mType,
 				Delta: &val,

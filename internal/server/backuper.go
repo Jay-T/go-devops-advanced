@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 // StorageBackuper interfaces describes a storage for metrics.
 type StorageBackuper interface {
-	SaveMetric(ctx context.Context, mMap map[string]Metric) error
-	RestoreMetrics(ctx context.Context, mMap map[string]Metric) error
+	SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error
+	RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error
 	CheckStorageStatus(w http.ResponseWriter, r *http.Request)
 }
 
@@ -22,7 +24,7 @@ type DBStorageBackuper struct {
 }
 
 // SaveMetric saves metrics to storage (DB).
-func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]Metric) error {
+func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error {
 	addRecordQuery := `
 		INSERT INTO metrics (id, mtype, delta, value) 
 		VALUES ($1, $2, $3, $4)
@@ -58,8 +60,8 @@ func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[st
 }
 
 // RestoreMetrics restores metrics from storage (DB).
-func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]Metric) error {
-	recs := make([]Metric, 0)
+func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error {
+	recs := make([]metric.Metric, 0)
 	query := `
 		SELECT * FROM metrics
 	`
@@ -75,7 +77,7 @@ func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap ma
 	}()
 
 	for rows.Next() {
-		var rec Metric
+		var rec metric.Metric
 		err = rows.Scan(&rec.ID, &rec.MType, &rec.Delta, &rec.Value)
 		if err != nil {
 			return err
@@ -129,8 +131,8 @@ type FileStorageBackuper struct {
 }
 
 // SaveMetric saves metrics to storage (file).
-func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]Metric) error {
-	var MetricList []Metric
+func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error {
+	var MetricList []metric.Metric
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	producer, err := NewProducer(fileBackuper.filename, flags)
 	if err != nil {
@@ -151,7 +153,7 @@ func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap ma
 }
 
 // RestoreMetrics restores metrics from storage (file).
-func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]Metric) error {
+func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error {
 	flags := os.O_RDONLY | os.O_CREATE
 	consumer, err := NewConsumer(fileBackuper.filename, flags)
 	if err != nil {

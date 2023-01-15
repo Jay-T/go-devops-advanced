@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,8 +39,8 @@ func TestSaveListToDB(t *testing.T) {
 		db: db,
 	}
 
-	mList := make([]Metric, 0, 43)
-	mList = []Metric{
+	mList := make([]metric.Metric, 0, 43)
+	mList = []metric.Metric{
 		{
 			ID:    "Alloc",
 			MType: gauge,
@@ -55,7 +56,7 @@ func TestSaveListToDB(t *testing.T) {
 	}
 
 	s := GenericService{
-		Metrics:  map[string]Metric{},
+		Metrics:  map[string]metric.Metric{},
 		backuper: dbs,
 	}
 

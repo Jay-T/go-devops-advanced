@@ -9,8 +9,10 @@ import (
 	"net"
 
 	pb "github.com/Jay-T/go-devops.git/internal/pb"
+	"github.com/Jay-T/go-devops.git/internal/utils/converter"
+	"github.com/Jay-T/go-devops.git/internal/utils/helpers"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/reflection"
 )
 
@@ -40,7 +42,15 @@ func (s *GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) 
 		log.Fatal(err)
 	}
 
-	server := grpc.NewServer(grpc.ChainUnaryInterceptor(s.checkReqIDInterceptor, s.checkIPInterceptor))
+	interceptors := []grpc.UnaryServerInterceptor{
+		s.checkReqIDInterceptor,
+	}
+
+	if s.Cfg.TrustedSubnet != "" {
+		interceptors = append(interceptors, s.checkIPInterceptor)
+	}
+
+	server := grpc.NewServer(grpc.ChainUnaryInterceptor(interceptors...))
 	pb.RegisterMetricsAgentServer(server, s)
 	reflection.Register(server)
 
@@ -55,29 +65,11 @@ func (s *GRPCServer) StartServer(ctx context.Context, backuper StorageBackuper) 
 	log.Printf("Finished to serve gRPC requests")
 }
 
-func (s *GRPCServer) convertData(m *pb.Metric) (*Metric, error) {
-	if m.Mtype == counter {
-		return &Metric{
-			ID:    m.Id,
-			MType: m.Mtype,
-			Delta: &m.Delta,
-			Hash:  m.Hash,
-		}, nil
-	}
-	return &Metric{
-		ID:    m.Id,
-		MType: m.Mtype,
-		Value: &m.Value,
-		Hash:  m.Hash,
-	}, nil
-}
-
 // UpdateMetric receives a Metric from client and updates it in storage.
 func (s *GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequest) (*pb.UpdateMetricResponse, error) {
-	md, _ := metadata.FromIncomingContext(ctx)
-	reqID := md.Get("Request-ID")[0]
+	reqID := helpers.GetReqID(ctx)
 
-	m, err := s.convertData(in.Metric)
+	m, err := converter.ConvertData(in.Metric)
 	if err != nil {
 		return &pb.UpdateMetricResponse{
 			Error: fmt.Sprintf("Could not convert received data. Req-id: %s", reqID),
@@ -86,7 +78,7 @@ func (s *GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricReques
 	var remoteHash []byte
 
 	if s.Cfg.Key != "" {
-		localHash := s.GenerateHash(m)
+		localHash := m.GenerateHash(s.Cfg.Key)
 		remoteHash, err = hex.DecodeString(m.Hash)
 		if err != nil {
 			return &pb.UpdateMetricResponse{
@@ -106,12 +98,11 @@ func (s *GRPCServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricReques
 
 // UpdateMetrics receives a slice of Metric from client and updates these metrics in storage.
 func (s *GRPCServer) UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsRequest) (*pb.UpdateMetricsResponse, error) {
-	md, _ := metadata.FromIncomingContext(ctx)
-	reqID := md.Get("Request-ID")[0]
+	reqID := helpers.GetReqID(ctx)
 
-	mList := make([]Metric, 0, 43)
+	mList := make([]metric.Metric, 0, 43)
 	for _, i := range in.Metrics {
-		m, err := s.convertData(i)
+		m, err := converter.ConvertData(i)
 		if err != nil {
 			return &pb.UpdateMetricsResponse{
 				Error: fmt.Sprintf("Could not convert received data. Req-id: %s", reqID),

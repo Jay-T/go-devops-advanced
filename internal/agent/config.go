@@ -39,7 +39,6 @@ type Config struct {
 	Key            string        `env:"KEY"`
 	CryptoKey      string        `env:"CRYPTO_KEY"`
 	ConfigFile     string        `env:"CONFIG"`
-	LocalInterface string        `env:"LOCAL_INTERFACE"`
 	GRPC           bool
 }
 
@@ -48,7 +47,6 @@ type ConfigFile struct {
 	ReportInterval time.Duration `json:"report_interval"`
 	PollInterval   time.Duration `json:"poll_interval"`
 	CryptoKey      string        `json:"crypto_key"`
-	LocalInterface string        `json:"local_interface"`
 }
 
 func (config *ConfigFile) UnmarshalJSON(b []byte) error {
@@ -111,10 +109,6 @@ func loadConfigFromFile(c *Config) error {
 		c.CryptoKey = cfgFromFile.CryptoKey
 	}
 
-	if c.LocalInterface == defaultLocalInterface && cfgFromFile.LocalInterface != "" {
-		c.LocalInterface = cfgFromFile.LocalInterface
-	}
-
 	return nil
 }
 
@@ -127,7 +121,6 @@ func GetConfig() (*Config, error) {
 	flag.DurationVar(&c.PollInterval, "p", defaultPollInterval, "Metric poll interval")
 	flag.StringVar(&c.CryptoKey, "crypto-key", defaultCryptoKey, "Path to public key")
 	flag.StringVar(&c.Key, "k", defaultKey, "Encryption key")
-	flag.StringVar(&c.LocalInterface, "intf", defaultLocalInterface, "Local network interface")
 	flag.StringVar(&c.ConfigFile, "config", "", "Config file name")
 	flag.StringVar(&c.ConfigFile, "c", "", "Config file name")
 	flag.BoolVar(&c.GRPC, "grpc", false, "Run as gRPC service")

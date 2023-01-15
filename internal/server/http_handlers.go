@@ -15,6 +15,9 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/converter"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 //go:embed metrics.html
@@ -47,11 +50,11 @@ func (s HTTPServer) GetAllMetricHandler(w http.ResponseWriter, r *http.Request) 
 // URI: "/update/".
 func (s HTTPServer) SetMetricHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		m, err := s.GetBody(r)
+		m, err := converter.GetBody(r)
 		var remoteHash []byte
 
 		if s.Cfg.Key != "" {
-			localHash := s.GenerateHash(m)
+			localHash := m.GenerateHash(s.Cfg.Key)
 			remoteHash, err = hex.DecodeString(m.Hash)
 			if err != nil {
 				http.Error(w, "Hash validation error", http.StatusInternalServerError)
@@ -85,7 +88,7 @@ func (s HTTPServer) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 		if err != nil {
 			log.Println(err)
 		}
-		m := make([]Metric, 0, 43)
+		m := make([]metric.Metric, 0, 43)
 		err = json.Unmarshal(body, &m)
 		if err != nil {
 			http.Error(w, "Internal error during JSON parsing", http.StatusInternalServerError)
@@ -105,7 +108,7 @@ func (s HTTPServer) SetMetricListHandler(ctx context.Context) http.HandlerFunc {
 // GetMetricHandler returns a metric which was specified in HTTP POST request.
 // URI: "/value/".
 func (s HTTPServer) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
-	m, err := s.GetBody(r)
+	m, err := converter.GetBody(r)
 	if err != nil {
 		http.Error(w, "Internal error during JSON unmarshal", http.StatusInternalServerError)
 		return
@@ -121,15 +124,18 @@ func (s HTTPServer) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Not found", http.StatusNotFound)
 		return
 	}
-
-	if s.Cfg.Key != "" {
-		data.Hash = hex.EncodeToString(s.GenerateHash(&data))
-	}
-
-	res, err := json.Marshal(data)
+	res, err := data.PrepareMetricAsJSON(s.Cfg.Key)
 	if err != nil {
 		http.Error(w, "Internal error during JSON marshal", http.StatusInternalServerError)
 	}
+	// if s.Cfg.Key != "" {
+	// 	data.Hash = hex.EncodeToString(data.GenerateHash(s.Cfg.Address))
+	// }
+
+	// res, err := json.Marshal(data)
+	// if err != nil {
+	// 	http.Error(w, "Internal error during JSON marshal", http.StatusInternalServerError)
+	// }
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(res)
 	if err != nil {
@@ -205,11 +211,6 @@ func (s *HTTPServer) decryptHandler(next http.Handler) http.Handler {
 
 func (s *HTTPServer) trustedNetworkCheckHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.Cfg.TrustedSubnet == "" {
-			next.ServeHTTP(w, r)
-			return
-		}
-
 		reqXRealIP := r.Header.Get("X-Real-Ip")
 		if reqXRealIP == "" {
 			http.Error(w, "Request does not have X-Real-Ip header.", http.StatusForbidden)
@@ -218,13 +219,7 @@ func (s *HTTPServer) trustedNetworkCheckHandler(next http.Handler) http.Handler 
 
 		ip := net.ParseIP(reqXRealIP)
 
-		_, ipV4Net, err := net.ParseCIDR(s.Cfg.TrustedSubnet)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-
-		if !ipV4Net.Contains(ip) {
+		if !s.trustedSubnet.Contains(ip) {
 			http.Error(w, fmt.Sprintf("Access is forbidden for %s", ip), http.StatusForbidden)
 			return
 		}
