@@ -35,6 +35,9 @@ func NewHTTPAgent(cfg *Config) (*HTTPAgent, error) {
 func (a *HTTPAgent) sendData(m *metric.Metric) error {
 	var url string
 	mSer, err := m.PrepareMetricAsJSON(a.Cfg.Key)
+	if err != nil {
+		return err
+	}
 
 	url = fmt.Sprintf("http://%s/update/", a.Cfg.Address)
 
