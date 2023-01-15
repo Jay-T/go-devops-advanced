@@ -34,7 +34,8 @@ func GetLocalInterfaceAddress(remoteAddress string) (string, error) {
 	// 	}
 	// }
 
-	conn, err := net.Dial("tcp4", remoteAddress)
+	conn, err := net.Dial("udp4", remoteAddress)
+	defer conn.Close()
 
 	if err != nil {
 		log.Println(err)
