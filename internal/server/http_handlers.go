@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/Jay-T/go-devops.git/internal/utils/converter"
 	"github.com/Jay-T/go-devops.git/internal/utils/metric"
@@ -128,14 +129,7 @@ func (s HTTPServer) GetMetricHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "Internal error during JSON marshal", http.StatusInternalServerError)
 	}
-	// if s.Cfg.Key != "" {
-	// 	data.Hash = hex.EncodeToString(data.GenerateHash(s.Cfg.Address))
-	// }
 
-	// res, err := json.Marshal(data)
-	// if err != nil {
-	// 	http.Error(w, "Internal error during JSON marshal", http.StatusInternalServerError)
-	// }
 	w.WriteHeader(http.StatusOK)
 	_, err = w.Write(res)
 	if err != nil {
@@ -226,4 +220,15 @@ func (s *HTTPServer) trustedNetworkCheckHandler(next http.Handler) http.Handler 
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (s *HTTPServer) CheckStorageStatusHandler(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	if err := s.backuper.CheckStorageStatus(ctx); err != nil {
+		http.Error(w, "Storage is inaccesible.", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
 }

@@ -153,10 +153,13 @@ func (a *GRPCAgent) Run(ctx context.Context, doneChan chan<- struct{}) {
 	dataChan := make(chan Data)
 	syncChan := make(chan time.Time)
 
+	// GenericAgent methods
 	go a.RunTicker(ctx, syncChan)
 	go a.NewMetric(ctx, dataChan)
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
+
+	// GRPCAgent method
 	go a.SendDataByInterval(ctx, dataChan, doneChan)
 }

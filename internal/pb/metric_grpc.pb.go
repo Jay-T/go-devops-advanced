@@ -11,6 +11,7 @@ import (
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 // This is a compile-time assertion to ensure that this generated file
@@ -24,6 +25,9 @@ const _ = grpc.SupportPackageIsVersion7
 type MetricsAgentClient interface {
 	UpdateMetric(ctx context.Context, in *UpdateMetricRequest, opts ...grpc.CallOption) (*UpdateMetricResponse, error)
 	UpdateMetrics(ctx context.Context, in *UpdateMetricsRequest, opts ...grpc.CallOption) (*UpdateMetricsResponse, error)
+	CheckStorageStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetMetric(ctx context.Context, in *GetMetricRequest, opts ...grpc.CallOption) (*GetMetricResponse, error)
+	GetAllMetrics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAllMetricsResponse, error)
 }
 
 type metricsAgentClient struct {
@@ -52,12 +56,42 @@ func (c *metricsAgentClient) UpdateMetrics(ctx context.Context, in *UpdateMetric
 	return out, nil
 }
 
+func (c *metricsAgentClient) CheckStorageStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, "/go_devops_advanced.MetricsAgent/CheckStorageStatus", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *metricsAgentClient) GetMetric(ctx context.Context, in *GetMetricRequest, opts ...grpc.CallOption) (*GetMetricResponse, error) {
+	out := new(GetMetricResponse)
+	err := c.cc.Invoke(ctx, "/go_devops_advanced.MetricsAgent/GetMetric", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *metricsAgentClient) GetAllMetrics(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*GetAllMetricsResponse, error) {
+	out := new(GetAllMetricsResponse)
+	err := c.cc.Invoke(ctx, "/go_devops_advanced.MetricsAgent/GetAllMetrics", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // MetricsAgentServer is the server API for MetricsAgent service.
 // All implementations must embed UnimplementedMetricsAgentServer
 // for forward compatibility
 type MetricsAgentServer interface {
 	UpdateMetric(context.Context, *UpdateMetricRequest) (*UpdateMetricResponse, error)
 	UpdateMetrics(context.Context, *UpdateMetricsRequest) (*UpdateMetricsResponse, error)
+	CheckStorageStatus(context.Context, *emptypb.Empty) (*emptypb.Empty, error)
+	GetMetric(context.Context, *GetMetricRequest) (*GetMetricResponse, error)
+	GetAllMetrics(context.Context, *emptypb.Empty) (*GetAllMetricsResponse, error)
 	mustEmbedUnimplementedMetricsAgentServer()
 }
 
@@ -70,6 +104,15 @@ func (UnimplementedMetricsAgentServer) UpdateMetric(context.Context, *UpdateMetr
 }
 func (UnimplementedMetricsAgentServer) UpdateMetrics(context.Context, *UpdateMetricsRequest) (*UpdateMetricsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateMetrics not implemented")
+}
+func (UnimplementedMetricsAgentServer) CheckStorageStatus(context.Context, *emptypb.Empty) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CheckStorageStatus not implemented")
+}
+func (UnimplementedMetricsAgentServer) GetMetric(context.Context, *GetMetricRequest) (*GetMetricResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetMetric not implemented")
+}
+func (UnimplementedMetricsAgentServer) GetAllMetrics(context.Context, *emptypb.Empty) (*GetAllMetricsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAllMetrics not implemented")
 }
 func (UnimplementedMetricsAgentServer) mustEmbedUnimplementedMetricsAgentServer() {}
 
@@ -120,6 +163,60 @@ func _MetricsAgent_UpdateMetrics_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MetricsAgent_CheckStorageStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetricsAgentServer).CheckStorageStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/go_devops_advanced.MetricsAgent/CheckStorageStatus",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetricsAgentServer).CheckStorageStatus(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MetricsAgent_GetMetric_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMetricRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetricsAgentServer).GetMetric(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/go_devops_advanced.MetricsAgent/GetMetric",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetricsAgentServer).GetMetric(ctx, req.(*GetMetricRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MetricsAgent_GetAllMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MetricsAgentServer).GetAllMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/go_devops_advanced.MetricsAgent/GetAllMetrics",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MetricsAgentServer).GetAllMetrics(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // MetricsAgent_ServiceDesc is the grpc.ServiceDesc for MetricsAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -134,6 +231,18 @@ var MetricsAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateMetrics",
 			Handler:    _MetricsAgent_UpdateMetrics_Handler,
+		},
+		{
+			MethodName: "CheckStorageStatus",
+			Handler:    _MetricsAgent_CheckStorageStatus_Handler,
+		},
+		{
+			MethodName: "GetMetric",
+			Handler:    _MetricsAgent_GetMetric_Handler,
+		},
+		{
+			MethodName: "GetAllMetrics",
+			Handler:    _MetricsAgent_GetAllMetrics_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

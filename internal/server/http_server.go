@@ -55,7 +55,7 @@ func (s HTTPServer) StartServer(ctx context.Context, backuper StorageBackuper) {
 	r.Post("/update/", s.SetMetricHandler(ctx))
 	r.Post("/updates/", s.SetMetricListHandler(ctx))
 	r.Post("/value/", s.GetMetricHandler)
-	r.Get("/ping", backuper.CheckStorageStatus)
+	r.Get("/ping", s.CheckStorageStatusHandler)
 
 	srv := &http.Server{
 		Addr:    s.Cfg.Address,

@@ -2,13 +2,15 @@ syntax = "proto3";
 
 package go_devops_advanced;
 
+import "google/protobuf/empty.proto";
+
 option go_package = "github.com/Jay-T/go-devops/internal/pb";
 
 message Metric {
   string id = 1;
   string mtype = 2;
-  sint64 delta = 3;
-  double value = 4;
+  optional sint64 delta = 3;
+  optional double value = 4;
   string hash = 5;
 }
 
@@ -28,7 +30,22 @@ message UpdateMetricsResponse {
   string error = 1;
 }
 
+message GetMetricRequest {
+  string id = 1;
+}
+
+message GetMetricResponse {
+  Metric metric = 1;
+}
+
+message GetAllMetricsResponse {
+  repeated Metric metrics = 1;
+}
+
 service MetricsAgent {
   rpc UpdateMetric(UpdateMetricRequest) returns (UpdateMetricResponse) {}
   rpc UpdateMetrics(UpdateMetricsRequest) returns (UpdateMetricsResponse) {}
+  rpc CheckStorageStatus(google.protobuf.Empty) returns (google.protobuf.Empty) {}
+  rpc GetMetric(GetMetricRequest) returns (GetMetricResponse) {}
+  rpc GetAllMetrics(google.protobuf.Empty) returns (GetAllMetricsResponse) {}
 }

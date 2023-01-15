@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log"
-	"net/http"
 	"os"
-	"time"
 
 	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
@@ -15,7 +13,7 @@ import (
 type StorageBackuper interface {
 	SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error
 	RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error
-	CheckStorageStatus(w http.ResponseWriter, r *http.Request)
+	CheckStorageStatus(ctx context.Context) error
 }
 
 // DBStorageBackuper backs up metrics to DB.
@@ -113,16 +111,12 @@ func (dbBackuper *DBStorageBackuper) DBInit(ctx context.Context) error {
 }
 
 // CheckStorageStatus checks DB connection.
-// URI: "/ping".
-func (dbBackuper *DBStorageBackuper) CheckStorageStatus(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
+func (dbBackuper *DBStorageBackuper) CheckStorageStatus(ctx context.Context) error {
 	if err := dbBackuper.db.PingContext(ctx); err != nil {
 		log.Println(err)
-		http.Error(w, "Error in DB connection.", http.StatusInternalServerError)
-		return
+		return err
 	}
-	w.WriteHeader(http.StatusOK)
+	return nil
 }
 
 // FileStorageBackuper backs up metrics to a file.
@@ -167,14 +161,8 @@ func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMa
 }
 
 // CheckStorageStatus checks nothing here. Interface requirement.
-// URI: "/ping".
-func (fileBackuper *FileStorageBackuper) CheckStorageStatus(w http.ResponseWriter, r *http.Request) {
-	_, err := w.Write([]byte("The storage file is pretty fine."))
-	if err != nil {
-		log.Println(err)
-	}
-
-	w.WriteHeader(http.StatusOK)
+func (fileBackuper *FileStorageBackuper) CheckStorageStatus(ctx context.Context) error {
+	return nil
 }
 
 // NewBackuper returns a new backuper instance.

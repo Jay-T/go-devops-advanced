@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
 	"net"
 
 	"google.golang.org/grpc"
@@ -26,7 +25,6 @@ func (s *GRPCServer) checkIPInterceptor(ctx context.Context, req interface{}, in
 	reqXRealIP := reqXRealIPList[0]
 	ip := net.ParseIP(reqXRealIP)
 
-	log.Println(ip.String())
 	if !s.trustedSubnet.Contains(ip) {
 		return nil, status.Error(codes.PermissionDenied, fmt.Sprintf("X-Real-Ip is not trusted. Aborting request. Req-ID: %s", reqID))
 	}

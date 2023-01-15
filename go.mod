@@ -13,7 +13,7 @@ require (
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/stretchr/testify v1.7.0
 	golang.org/x/tools v0.3.0
-	google.golang.org/grpc v1.52.0
+	google.golang.org/grpc v1.51.0
 	google.golang.org/protobuf v1.28.1
 	honnef.co/go/tools v0.3.3
 )

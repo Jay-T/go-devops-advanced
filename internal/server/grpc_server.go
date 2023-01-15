@@ -13,7 +13,10 @@ import (
 	"github.com/Jay-T/go-devops.git/internal/utils/helpers"
 	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // GRPCServer struct describes GRPC server based on GenericService.
@@ -119,4 +122,40 @@ func (s *GRPCServer) UpdateMetrics(ctx context.Context, in *pb.UpdateMetricsRequ
 	}
 
 	return &pb.UpdateMetricsResponse{}, nil
+}
+
+func (s *GRPCServer) GetMetric(ctx context.Context, in *pb.GetMetricRequest) (*pb.GetMetricResponse, error) {
+	reqID := helpers.GetReqID(ctx)
+
+	m, found := s.Metrics[in.Id]
+	if !found {
+		return nil, status.Error(codes.NotFound, fmt.Sprintf("Unknown metric id: %s. Req-id: %s", in.Id, reqID))
+	}
+
+	mpb := m.ConvertMetricToPB(s.Cfg.Key)
+
+	return &pb.GetMetricResponse{
+		Metric: mpb,
+	}, nil
+}
+
+func (s *GRPCServer) GetAllMetrics(ctx context.Context, in *emptypb.Empty) (*pb.GetAllMetricsResponse, error) {
+	var mList []*pb.Metric
+
+	for _, m := range s.Metrics {
+		mpb := m.ConvertMetricToPB(s.Cfg.Key)
+		mList = append(mList, mpb)
+	}
+
+	return &pb.GetAllMetricsResponse{
+		Metrics: mList,
+	}, nil
+}
+
+func (s *GRPCServer) CheckStorageStatus(ctx context.Context, in *emptypb.Empty) (*emptypb.Empty, error) {
+	if err := s.backuper.CheckStorageStatus(ctx); err != nil {
+		return nil, status.Error(codes.Internal, "storage is inaccesible.")
+	}
+
+	return &emptypb.Empty{}, nil
 }

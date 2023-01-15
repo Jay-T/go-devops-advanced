@@ -178,5 +178,7 @@ func (a *HTTPAgent) Run(ctx context.Context, doneChan chan<- struct{}) {
 	go a.GetDataByInterval(ctx, dataChan, syncChan)
 	go a.GetMemDataByInterval(ctx, dataChan, syncChan)
 	go a.GetCPUDataByInterval(ctx, dataChan)
+
+	// HTTPAgent method
 	go a.SendDataByInterval(ctx, dataChan, doneChan)
 }

@@ -74,14 +74,14 @@ func (m *Metric) ConvertMetricToPB(key string) *pb.Metric {
 		return &pb.Metric{
 			Id:    m.ID,
 			Mtype: m.MType,
-			Delta: *m.Delta,
+			Delta: m.Delta,
 			Hash:  m.Hash,
 		}
 	}
 	return &pb.Metric{
 		Id:    m.ID,
 		Mtype: m.MType,
-		Value: *m.Value,
+		Value: m.Value,
 		Hash:  m.Hash,
 	}
 }

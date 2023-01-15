@@ -18,29 +18,20 @@ func GetReqID(ctx context.Context) string {
 // GetLocalInterfaceAddress returns IP address of interface <ifname>.
 func GetLocalInterfaceAddress(remoteAddress string) (string, error) {
 	var localAddress string
-	// iface, err := net.InterfaceByName(ifname)
-	// if err != nil {
-	// 	log.Fatal("Error while getting local interfaces.", err.Error())
-	// }
-
-	// if iface != nil {
-	// 	addresses, err := iface.Addrs()
-	// 	if err != nil {
-	// 		log.Fatal("Error while getting an address from local interface.", err.Error())
-	// 	}
-	// 	address := addresses[0]
-	// 	if ipnet, ok := address.(*net.IPNet); ok {
-	// 		localAddress = ipnet.IP.String()
-	// 	}
-	// }
 
 	conn, err := net.Dial("udp4", remoteAddress)
-	defer conn.Close()
-
 	if err != nil {
 		log.Println(err)
 		return "", err
 	}
+
+	defer func() {
+		err = conn.Close()
+		if err != nil {
+			log.Print(err)
+		}
+	}()
+
 	localAddress = strings.Split(conn.LocalAddr().String(), ":")[0]
 
 	return localAddress, nil

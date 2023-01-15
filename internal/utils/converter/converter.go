@@ -20,14 +20,14 @@ func ConvertData(pbm *pb.Metric) (*metric.Metric, error) {
 		return &metric.Metric{
 			ID:    pbm.Id,
 			MType: pbm.Mtype,
-			Delta: &pbm.Delta,
+			Delta: pbm.Delta,
 			Hash:  pbm.Hash,
 		}, nil
 	}
 	return &metric.Metric{
 		ID:    pbm.Id,
 		MType: pbm.Mtype,
-		Value: &pbm.Value,
+		Value: pbm.Value,
 		Hash:  pbm.Hash,
 	}, nil
 }

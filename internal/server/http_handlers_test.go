@@ -274,7 +274,7 @@ func TestSetMetricListHandler(t *testing.T) {
 	}
 }
 
-func TestCheckStorageStatus(t *testing.T) {
+func TestCheckStorageStatusHandler(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -286,15 +286,20 @@ func TestCheckStorageStatus(t *testing.T) {
 		}
 	}()
 
-	dbs := &DBStorageBackuper{
-		db: db,
+	s := HTTPServer{
+		&GenericService{
+			Metrics: map[string]metric.Metric{},
+			backuper: &DBStorageBackuper{
+				db: db,
+			},
+		},
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/", nil)
 
 	mock.ExpectPing()
 	w := httptest.NewRecorder()
-	h := http.HandlerFunc(dbs.CheckStorageStatus)
+	h := http.HandlerFunc(s.CheckStorageStatusHandler)
 
 	h.ServeHTTP(w, request)
 	res := w.Result()
@@ -306,7 +311,7 @@ func TestCheckStorageStatus(t *testing.T) {
 
 	mock.ExpectPing().WillReturnError(New("TestError"))
 	w = httptest.NewRecorder()
-	h = http.HandlerFunc(dbs.CheckStorageStatus)
+	h = http.HandlerFunc(s.CheckStorageStatusHandler)
 
 	h.ServeHTTP(w, request)
 	res = w.Result()
