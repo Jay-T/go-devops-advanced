@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 // SetMetricOldHandler - an old handler that receives metrics in URI.
@@ -14,9 +16,9 @@ import (
 // URI: "/update/gcounter/{metricName}/{metricValue}".
 //
 // Deprecated: use SetMetricHandler instead.
-func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackuper) http.HandlerFunc {
+func (s HTTPServer) SetMetricOldHandler(ctx context.Context) http.HandlerFunc {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var m Metric
+		var m metric.Metric
 
 		mType := strings.Split(r.RequestURI, "/")[2]
 		mName := strings.Split(r.RequestURI, "/")[3]
@@ -29,7 +31,7 @@ func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackup
 				http.Error(w, "parsing error. Bad request", http.StatusBadRequest)
 				return
 			}
-			m = Metric{
+			m = metric.Metric{
 				ID:    mName,
 				MType: mType,
 				Value: &val,
@@ -40,7 +42,7 @@ func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackup
 				http.Error(w, "parsing error. Bad request", http.StatusBadRequest)
 				return
 			}
-			m = Metric{
+			m = metric.Metric{
 				ID:    mName,
 				MType: mType,
 				Delta: &val,
@@ -49,7 +51,7 @@ func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackup
 			log.Printf("Metric type '%s' is not expected. Skipping.", mType)
 		}
 		w.WriteHeader(http.StatusOK)
-		s.saveMetric(ctx, backuper, &m)
+		s.saveMetric(ctx, &m)
 	})
 }
 
@@ -57,7 +59,7 @@ func (s Service) SetMetricOldHandler(ctx context.Context, backuper StorageBackup
 // URI: "/value/".
 //
 // Deprecated: use GetMetricHandler instead.
-func (s Service) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
+func (s HTTPServer) GetMetricOldHandler(w http.ResponseWriter, r *http.Request) {
 	var returnValue float64
 	splitURL := strings.Split(r.URL.Path, "/")
 	if len(splitURL) < 4 {

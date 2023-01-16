@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/require"
 )
 
@@ -29,34 +30,34 @@ func Test_SendData(t *testing.T) {
 	tests := []struct {
 		name    string
 		fields  fields
-		client  *http.Client
 		want    bool
 		wantErr bool
 	}{
 		{
 			name:    "test one",
 			fields:  fields{name: "Alloc", typename: gauge, value: 1.5},
-			client:  &http.Client{Timeout: 2 * time.Second},
 			wantErr: false,
 		},
 		{
 			name:    "test two",
 			fields:  fields{name: "PollCounter", typename: counter, delta: 1},
-			client:  &http.Client{Timeout: 2 * time.Second},
 			wantErr: false,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := Agent{
-				Cfg: &Config{
-					Address:        "localhost:8080",
-					ReportInterval: 10,
-					PollInterval:   2,
+			a := HTTPAgent{
+				&GenericAgent{
+					Cfg: &Config{
+						Address:        "localhost:8080",
+						ReportInterval: 10,
+						PollInterval:   2,
+					},
 				},
+				&http.Client{Timeout: 2 * time.Second},
 			}
 
-			m := Metric{
+			m := metric.Metric{
 				ID:    tt.fields.name,
 				MType: tt.fields.typename,
 				Value: &tt.fields.value,
@@ -116,15 +117,18 @@ func Test_SendDataOld(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := Agent{
-				Cfg: &Config{
-					Address:        "localhost:8080",
-					ReportInterval: 10,
-					PollInterval:   2,
+			a := HTTPAgent{
+				&GenericAgent{
+					Cfg: &Config{
+						Address:        "localhost:8080",
+						ReportInterval: 10,
+						PollInterval:   2,
+					},
 				},
+				&http.Client{},
 			}
 
-			m := Metric{
+			m := metric.Metric{
 				ID:    tt.fields.name,
 				MType: tt.fields.typename,
 				Value: &tt.fields.value,

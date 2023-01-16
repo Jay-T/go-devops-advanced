@@ -4,16 +4,16 @@ import (
 	"context"
 	"database/sql"
 	"log"
-	"net/http"
 	"os"
-	"time"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 // StorageBackuper interfaces describes a storage for metrics.
 type StorageBackuper interface {
-	SaveMetric(ctx context.Context, mMap map[string]Metric) error
-	RestoreMetrics(ctx context.Context, mMap map[string]Metric) error
-	CheckStorageStatus(w http.ResponseWriter, r *http.Request)
+	SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error
+	RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error
+	CheckStorageStatus(ctx context.Context) error
 }
 
 // DBStorageBackuper backs up metrics to DB.
@@ -22,7 +22,7 @@ type DBStorageBackuper struct {
 }
 
 // SaveMetric saves metrics to storage (DB).
-func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]Metric) error {
+func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error {
 	addRecordQuery := `
 		INSERT INTO metrics (id, mtype, delta, value) 
 		VALUES ($1, $2, $3, $4)
@@ -58,8 +58,8 @@ func (dbBackuper *DBStorageBackuper) SaveMetric(ctx context.Context, mMap map[st
 }
 
 // RestoreMetrics restores metrics from storage (DB).
-func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]Metric) error {
-	recs := make([]Metric, 0)
+func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error {
+	recs := make([]metric.Metric, 0)
 	query := `
 		SELECT * FROM metrics
 	`
@@ -75,7 +75,7 @@ func (dbBackuper *DBStorageBackuper) RestoreMetrics(ctx context.Context, mMap ma
 	}()
 
 	for rows.Next() {
-		var rec Metric
+		var rec metric.Metric
 		err = rows.Scan(&rec.ID, &rec.MType, &rec.Delta, &rec.Value)
 		if err != nil {
 			return err
@@ -111,16 +111,12 @@ func (dbBackuper *DBStorageBackuper) DBInit(ctx context.Context) error {
 }
 
 // CheckStorageStatus checks DB connection.
-// URI: "/ping".
-func (dbBackuper *DBStorageBackuper) CheckStorageStatus(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
+func (dbBackuper *DBStorageBackuper) CheckStorageStatus(ctx context.Context) error {
 	if err := dbBackuper.db.PingContext(ctx); err != nil {
 		log.Println(err)
-		http.Error(w, "Error in DB connection.", http.StatusInternalServerError)
-		return
+		return err
 	}
-	w.WriteHeader(http.StatusOK)
+	return nil
 }
 
 // FileStorageBackuper backs up metrics to a file.
@@ -129,8 +125,8 @@ type FileStorageBackuper struct {
 }
 
 // SaveMetric saves metrics to storage (file).
-func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]Metric) error {
-	var MetricList []Metric
+func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap map[string]metric.Metric) error {
+	var MetricList []metric.Metric
 	flags := os.O_WRONLY | os.O_CREATE | os.O_TRUNC
 	producer, err := NewProducer(fileBackuper.filename, flags)
 	if err != nil {
@@ -151,7 +147,7 @@ func (fileBackuper *FileStorageBackuper) SaveMetric(ctx context.Context, mMap ma
 }
 
 // RestoreMetrics restores metrics from storage (file).
-func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]Metric) error {
+func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMap map[string]metric.Metric) error {
 	flags := os.O_RDONLY | os.O_CREATE
 	consumer, err := NewConsumer(fileBackuper.filename, flags)
 	if err != nil {
@@ -165,14 +161,8 @@ func (fileBackuper *FileStorageBackuper) RestoreMetrics(ctx context.Context, mMa
 }
 
 // CheckStorageStatus checks nothing here. Interface requirement.
-// URI: "/ping".
-func (fileBackuper *FileStorageBackuper) CheckStorageStatus(w http.ResponseWriter, r *http.Request) {
-	_, err := w.Write([]byte("The storage file is pretty fine."))
-	if err != nil {
-		log.Println(err)
-	}
-
-	w.WriteHeader(http.StatusOK)
+func (fileBackuper *FileStorageBackuper) CheckStorageStatus(ctx context.Context) error {
+	return nil
 }
 
 // NewBackuper returns a new backuper instance.
@@ -190,6 +180,7 @@ func NewBackuper(ctx context.Context, cfg *Config) (StorageBackuper, error) {
 		dbBackuper.db = db
 		err = dbBackuper.DBInit(ctx)
 		if err != nil {
+			log.Print(dbBackuper.db)
 			return nil, err
 		}
 		backuper = dbBackuper

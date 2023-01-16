@@ -20,7 +20,8 @@ const usage = `Usage of using_flag:
   -f string File for saving data (default "/tmp/devops-metrics-db.json")
   -i duration Save data interval (default 5m0s)
   -k string Encryption key
-  -r Restore data from file (default true)
+  -r bool Restore data from file (default true)
+  -t string Trusted subnet
 `
 
 const (
@@ -32,6 +33,7 @@ const (
 	defaultCryptoKey     string        = ""
 	defaultKey           string        = ""
 	defaultConfig        string        = ""
+	defaultTrustedSubnet string        = ""
 )
 
 // Config structure. Used for application configuration.
@@ -44,15 +46,18 @@ type Config struct {
 	DBAddress     string        `env:"DATABASE_DSN"`
 	CryptoKey     string        `env:"CRYPTO_KEY"`
 	ConfigFile    string        `env:"CONFIG"`
+	TrustedSubnet string        `env:"TRUSTED_SUBNET"`
+	GRPC          bool
 }
 
 type ConfigFile struct {
-	Address       string        `env:"ADDRESS" json:"address"`
-	StoreInterval time.Duration `env:"STORE_INTERVAL" json:"store_interval"`
-	StoreFile     string        `env:"STORE_FILE" json:"store_file"`
-	Restore       bool          `env:"RESTORE" json:"restore"`
-	DBAddress     string        `env:"DATABASE_DSN" json:"database_dsn"`
-	CryptoKey     string        `env:"CRYPTO_KEY" json:"crypto_key"`
+	Address       string        `json:"address"`
+	StoreInterval time.Duration `json:"store_interval"`
+	StoreFile     string        `json:"store_file"`
+	Restore       bool          `json:"restore"`
+	DBAddress     string        `json:"database_dsn"`
+	CryptoKey     string        `json:"crypto_key"`
+	TrustedSubnet string        `json:"trusted_subnet"`
 }
 
 func (config *ConfigFile) UnmarshalJSON(b []byte) error {
@@ -116,6 +121,10 @@ func loadConfigFromFile(c *Config) error {
 		c.DBAddress = cfgFromFile.DBAddress
 	}
 
+	if c.TrustedSubnet == defaultTrustedSubnet && cfgFromFile.TrustedSubnet != "" {
+		c.TrustedSubnet = cfgFromFile.TrustedSubnet
+	}
+
 	if c.CryptoKey == defaultCryptoKey && cfgFromFile.CryptoKey != "" {
 		c.CryptoKey = cfgFromFile.CryptoKey
 	}
@@ -134,8 +143,10 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&c.DBAddress, "d", defaultDBAddress, "Database address")
 	flag.StringVar(&c.CryptoKey, "crypto-key", defaultCryptoKey, "Path to private key")
 	flag.StringVar(&c.Key, "k", defaultKey, "Encryption key")
+	flag.StringVar(&c.TrustedSubnet, "t", defaultTrustedSubnet, "Trusted subnet")
 	flag.StringVar(&c.ConfigFile, "config", defaultConfig, "Config file name")
 	flag.StringVar(&c.ConfigFile, "c", defaultConfig, "Config file name")
+	flag.BoolVar(&c.GRPC, "grpc", false, "Run as gRPC service")
 	flag.Usage = func() { fmt.Print(usage) }
 	flag.Parse()
 

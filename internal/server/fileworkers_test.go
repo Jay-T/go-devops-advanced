@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,7 +24,7 @@ func TestReadEvents(t *testing.T) {
 		decoder: json.NewDecoder(data),
 	}
 
-	metrics := make(map[string]Metric)
+	metrics := make(map[string]metric.Metric)
 	err := c.ReadEvents(metrics)
 
 	assert.NoError(t, err, "Function returned error unexpectedly.")

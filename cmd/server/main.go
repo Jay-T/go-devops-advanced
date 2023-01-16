@@ -34,19 +34,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	s, err := server.NewService(ctx, cfg, backuper)
-	if err != nil {
-		log.Fatalf("Could not load server config. Error: %s", err)
-	}
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan,
 		syscall.SIGINT,
 		syscall.SIGTERM,
 		syscall.SIGQUIT)
 
+	s, err := server.NewServer(ctx, cfg, backuper)
+	if err != nil {
+		log.Fatalf("Could not run GRPC server. Error: %s", err)
+	}
 	go s.StartServer(ctx, backuper)
-
 	<-sigChan
 	s.StopServer(ctx, cancel, backuper)
 }

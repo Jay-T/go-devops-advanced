@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,15 +56,20 @@ func TestSetMetricHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Service{
-				Cfg: &Config{
-					Address:       "localhost:8080",
-					StoreInterval: 10,
-					StoreFile:     "file.json",
-					Restore:       true,
-					Key:           "testkey",
+			s := HTTPServer{
+				&GenericService{
+					Cfg: &Config{
+						Address:       "localhost:8080",
+						StoreInterval: 10,
+						StoreFile:     "file.json",
+						Restore:       true,
+						Key:           "testkey",
+					},
+					Metrics: map[string]metric.Metric{},
+					backuper: &FileStorageBackuper{
+						filename: "/tmp/test",
+					},
 				},
-				Metrics: map[string]Metric{},
 			}
 
 			mSer, _ := json.Marshal(tt.metric)
@@ -71,10 +78,7 @@ func TestSetMetricHandler(t *testing.T) {
 
 			ctx := context.TODO()
 
-			fs := &FileStorageBackuper{
-				filename: "/tmp/test",
-			}
-			h := http.HandlerFunc(s.SetMetricHandler(ctx, fs))
+			h := http.HandlerFunc(s.SetMetricHandler(ctx))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -91,12 +95,12 @@ func TestSetMetricHandler(t *testing.T) {
 func TestGetMetricHandler(t *testing.T) {
 	tests := []struct {
 		name     string
-		metric   Metric
+		metric   metric.Metric
 		wantCode int
 	}{
 		{
 			name: "Test One",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -106,7 +110,7 @@ func TestGetMetricHandler(t *testing.T) {
 		},
 		{
 			name: "Test Two",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "NoMetric",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -117,15 +121,17 @@ func TestGetMetricHandler(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Service{
-				Cfg: &Config{
-					Address:       "localhost:8080",
-					StoreInterval: 10,
-					StoreFile:     "file.json",
-					Restore:       true,
-					Key:           "testkey",
+			s := HTTPServer{
+				&GenericService{
+					Cfg: &Config{
+						Address:       "localhost:8080",
+						StoreInterval: 10,
+						StoreFile:     "file.json",
+						Restore:       true,
+						Key:           "testkey",
+					},
+					Metrics: map[string]metric.Metric{},
 				},
-				Metrics: map[string]Metric{},
 			}
 
 			s.Metrics["Alloc"] = tt.metric
@@ -150,12 +156,12 @@ func TestGetMetricHandler(t *testing.T) {
 func TestGenerateHash(t *testing.T) {
 	tests := []struct {
 		name   string
-		metric Metric
+		metric metric.Metric
 		want   []byte
 	}{
 		{
 			name: "Test One",
-			metric: Metric{
+			metric: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -166,17 +172,19 @@ func TestGenerateHash(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := Service{
-				Cfg: &Config{
-					Address:       "localhost:8080",
-					StoreInterval: 10,
-					StoreFile:     "file.json",
-					Restore:       true,
-					Key:           "testkey",
+			s := HTTPServer{
+				&GenericService{
+					Cfg: &Config{
+						Address:       "localhost:8080",
+						StoreInterval: 10,
+						StoreFile:     "file.json",
+						Restore:       true,
+						Key:           "testkey",
+					},
+					Metrics: map[string]metric.Metric{},
 				},
-				Metrics: map[string]Metric{},
 			}
-			res := s.GenerateHash(&tt.metric)
+			res := tt.metric.GenerateHash(s.Cfg.Key)
 
 			assert.Equal(t, tt.want, res)
 		})
@@ -196,23 +204,24 @@ func TestSetMetricListHandler(t *testing.T) {
 	}()
 	ctx := context.TODO()
 
-	s := Service{
-		Metrics: map[string]Metric{},
-	}
-
-	dbs := &DBStorageBackuper{
-		db: db,
+	s := HTTPServer{
+		&GenericService{
+			Metrics: map[string]metric.Metric{},
+			backuper: &DBStorageBackuper{
+				db: db,
+			},
+		},
 	}
 
 	tests := []struct {
 		name string
-		ml   []Metric
-		m    Metric
+		ml   []metric.Metric
+		m    metric.Metric
 		want int
 	}{
 		{
 			name: "Test One",
-			ml: []Metric{
+			ml: []metric.Metric{
 				{
 					ID:    "Alloc",
 					MType: gauge,
@@ -220,13 +229,13 @@ func TestSetMetricListHandler(t *testing.T) {
 					Hash:  "a2bc398d457f8e417dce8776440f230519f0ee5e2a0cf96130cc631272a9987b",
 				},
 			},
-			m:    Metric{},
+			m:    metric.Metric{},
 			want: 200,
 		},
 		{
 			name: "Test Two",
-			ml:   []Metric{},
-			m: Metric{
+			ml:   []metric.Metric{},
+			m: metric.Metric{
 				ID:    "Alloc",
 				MType: gauge,
 				Value: getFloatPointer(354872),
@@ -251,7 +260,7 @@ func TestSetMetricListHandler(t *testing.T) {
 			mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 			mock.ExpectCommit()
 
-			h := http.HandlerFunc(s.SetMetricListHandler(ctx, dbs))
+			h := http.HandlerFunc(s.SetMetricListHandler(ctx))
 
 			h.ServeHTTP(w, request)
 			res := w.Result()
@@ -265,7 +274,7 @@ func TestSetMetricListHandler(t *testing.T) {
 	}
 }
 
-func TestCheckStorageStatus(t *testing.T) {
+func TestCheckStorageStatusHandler(t *testing.T) {
 	db, mock, err := sqlmock.New(sqlmock.MonitorPingsOption(true))
 	if err != nil {
 		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
@@ -277,15 +286,20 @@ func TestCheckStorageStatus(t *testing.T) {
 		}
 	}()
 
-	dbs := &DBStorageBackuper{
-		db: db,
+	s := HTTPServer{
+		&GenericService{
+			Metrics: map[string]metric.Metric{},
+			backuper: &DBStorageBackuper{
+				db: db,
+			},
+		},
 	}
 
 	request := httptest.NewRequest(http.MethodPost, "/", nil)
 
 	mock.ExpectPing()
 	w := httptest.NewRecorder()
-	h := http.HandlerFunc(dbs.CheckStorageStatus)
+	h := http.HandlerFunc(s.CheckStorageStatusHandler)
 
 	h.ServeHTTP(w, request)
 	res := w.Result()
@@ -297,7 +311,7 @@ func TestCheckStorageStatus(t *testing.T) {
 
 	mock.ExpectPing().WillReturnError(New("TestError"))
 	w = httptest.NewRecorder()
-	h = http.HandlerFunc(dbs.CheckStorageStatus)
+	h = http.HandlerFunc(s.CheckStorageStatusHandler)
 
 	h.ServeHTTP(w, request)
 	res = w.Result()
@@ -313,12 +327,14 @@ func NewDelta(n int64) *int64 {
 }
 
 func TestGetMetricOldHandler(t *testing.T) {
-	s := Service{
-		Metrics: map[string]Metric{
-			"PollCount": {
-				ID:    "PollCount",
-				MType: counter,
-				Delta: NewDelta(2),
+	s := HTTPServer{
+		&GenericService{
+			Metrics: map[string]metric.Metric{
+				"PollCount": {
+					ID:    "PollCount",
+					MType: counter,
+					Delta: NewDelta(2),
+				},
 			},
 		},
 	}
@@ -432,8 +448,10 @@ func TestDecryptHandler(t *testing.T) {
 				log.Fatal(err)
 			}
 
-			s := Service{
-				Decryptor: decryptor,
+			s := HTTPServer{
+				&GenericService{
+					Decryptor: decryptor,
+				},
 			}
 			encrypted := bytes.NewReader(tt.body)
 			request := httptest.NewRequest(http.MethodPost, "/", encrypted)
@@ -450,6 +468,69 @@ func TestDecryptHandler(t *testing.T) {
 			assert.Equal(t, tt.httpStatusCode, res.StatusCode)
 
 			err = res.Body.Close()
+			if err != nil {
+				log.Println(err)
+			}
+		})
+	}
+}
+
+func TestTrustedNetworkCheckHandler(t *testing.T) {
+	tests := []struct {
+		name           string
+		trustedSubnet  string
+		requestAddress string
+		expectedCode   int
+	}{
+		{
+			name:           "Test One. Valid request.",
+			trustedSubnet:  "127.0.0.0/8",
+			requestAddress: "127.0.0.1",
+			expectedCode:   200,
+		},
+		{
+			name:           "Test Three. Forbidden address.",
+			trustedSubnet:  "10.0.0.0/8",
+			requestAddress: "127.0.0.1",
+			expectedCode:   403,
+		},
+		{
+			name:           "Test Three. Empty X-Real-Op header.",
+			trustedSubnet:  "10.0.0.0/8",
+			requestAddress: "",
+			expectedCode:   403,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, ipV4Net, _ := net.ParseCIDR(tt.trustedSubnet)
+			s := HTTPServer{
+				&GenericService{
+					Cfg: &Config{
+						TrustedSubnet: tt.trustedSubnet,
+					},
+					trustedSubnet: ipV4Net,
+				},
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/", nil)
+			if tt.requestAddress != "" {
+				request.Header.Add("X-Real-Ip", tt.requestAddress)
+			}
+
+			w := httptest.NewRecorder()
+			h1 := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			h0 := http.Handler(s.trustedNetworkCheckHandler(h1))
+
+			h0.ServeHTTP(w, request)
+			res := w.Result()
+
+			assert.Equal(t, tt.expectedCode, res.StatusCode)
+
+			err := res.Body.Close()
 			if err != nil {
 				log.Println(err)
 			}

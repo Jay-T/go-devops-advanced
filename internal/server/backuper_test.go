@@ -2,11 +2,14 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"testing"
 	"time"
 
+	"bou.ke/monkey"
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -54,8 +57,8 @@ func TestRestoreMetrics(t *testing.T) {
 		db: db,
 	}
 
-	s := Service{
-		Metrics: map[string]Metric{},
+	s := GenericService{
+		Metrics: map[string]metric.Metric{},
 	}
 
 	rs := sqlmock.NewRows([]string{"id", "mtype", "delta", "value"}).AddRow("Alloc", "gauge", "0", "23456")
@@ -68,7 +71,7 @@ func TestRestoreMetrics(t *testing.T) {
 	if err != nil {
 		log.Print(err)
 	}
-	assert.Equal(t, s.Metrics["Alloc"], Metric{
+	assert.Equal(t, s.Metrics["Alloc"], metric.Metric{
 		ID:    "Alloc",
 		MType: gauge,
 		Delta: getIntPointer(0),
@@ -93,11 +96,11 @@ func TestSaveMetricToDB(t *testing.T) {
 		db: db,
 	}
 
-	s := Service{
-		Metrics: map[string]Metric{},
+	s := GenericService{
+		Metrics: map[string]metric.Metric{},
 	}
 
-	s.Metrics = map[string]Metric{
+	s.Metrics = map[string]metric.Metric{
 		"Alloc": {
 			ID:    "Alloc",
 			MType: gauge,
@@ -122,4 +125,34 @@ func TestSaveMetricToDB(t *testing.T) {
 	mock.ExpectRollback()
 	err = dbs.SaveMetric(ctx, s.Metrics)
 	assert.Error(t, err)
+}
+
+func TestNewBackuper(t *testing.T) {
+	cfg := &Config{
+		DBAddress: "postgress://address.test/?sslmode=disable",
+	}
+	ctx := context.TODO()
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+
+	fakeOpen := func(str1 string, str2 string) (*sql.DB, error) {
+		return db, nil
+	}
+	patch := monkey.Patch(sql.Open, fakeOpen)
+	defer patch.Unpatch()
+
+	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS metrics .*`).WillReturnResult(sqlmock.NewResult(1, 1))
+
+	_, err = NewBackuper(ctx, cfg)
+	assert.NoError(t, err)
+
+	cfg = &Config{
+		DBAddress: "",
+		StoreFile: "/tmp/test",
+	}
+
+	_, err = NewBackuper(ctx, cfg)
+	assert.NoError(t, err)
 }

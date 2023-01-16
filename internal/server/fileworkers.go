@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"log"
 	"os"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
 // producer struct fo saving metrics to file.
@@ -31,7 +33,7 @@ func (p producer) Close() error {
 }
 
 // WriteMetric encodes MetricList before saving to file.
-func (p producer) WriteMetric(MetricList *[]Metric) error {
+func (p producer) WriteMetric(MetricList *[]metric.Metric) error {
 	return p.encoder.Encode(&MetricList)
 }
 
@@ -55,7 +57,7 @@ func NewConsumer(filename string, flags int) (*consumer, error) {
 }
 
 // ReadEvents reads metrics from file, decodes them as MetricList.
-func (c *consumer) ReadEvents(metrics map[string]Metric) error {
+func (c *consumer) ReadEvents(metrics map[string]metric.Metric) error {
 	var err error
 
 	defer func() {
@@ -64,7 +66,7 @@ func (c *consumer) ReadEvents(metrics map[string]Metric) error {
 			log.Println(err)
 		}
 	}()
-	MetricList := []Metric{}
+	MetricList := []metric.Metric{}
 	if err := c.decoder.Decode(&MetricList); err != nil {
 		return err
 	}

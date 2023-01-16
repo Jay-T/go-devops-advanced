@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 )
 
-func ExampleService_GetAllMetricHandler() {
+func ExampleHTTPServer_GetAllMetricHandler() {
 	url := "http://localhost:8080/"
 
 	resp, err := http.Get(url)
@@ -22,8 +24,8 @@ func ExampleService_GetAllMetricHandler() {
 	}
 }
 
-func ExampleService_SetMetricHandler() {
-	m := &Metric{}
+func ExampleHTTPServer_SetMetricHandler() {
+	m := &metric.Metric{}
 
 	mSer, err := json.Marshal(m)
 	if err != nil {
@@ -42,8 +44,8 @@ func ExampleService_SetMetricHandler() {
 	}
 }
 
-func ExampleService_SetMetricListHandler() {
-	m := &[]Metric{}
+func ExampleHTTPServer_SetMetricListHandler() {
+	m := &[]metric.Metric{}
 
 	mSer, err := json.Marshal(m)
 	if err != nil {
@@ -62,8 +64,8 @@ func ExampleService_SetMetricListHandler() {
 	}
 }
 
-func ExampleService_GetMetricHandler() {
-	m := &Metric{}
+func ExampleHTTPServer_GetMetricHandler() {
+	m := &metric.Metric{}
 
 	mSer, err := json.Marshal(m)
 	if err != nil {
@@ -82,7 +84,7 @@ func ExampleService_GetMetricHandler() {
 	}
 }
 
-func ExampleService_SetMetricOldHandler() {
+func ExampleHTTPServer_SetMetricOldHandler() {
 	metricName := "Alloc"
 	metricValue := 0.2345
 
@@ -98,7 +100,7 @@ func ExampleService_SetMetricOldHandler() {
 	}
 }
 
-func ExampleService_SetMetricOldHandler_second() {
+func ExampleHTTPServer_SetMetricOldHandler_second() {
 	metricName := "PollCount"
 	metricValue := 2
 
@@ -114,7 +116,7 @@ func ExampleService_SetMetricOldHandler_second() {
 	}
 }
 
-func ExampleService_GetMetricOldHandler() {
+func ExampleHTTPServer_GetMetricOldHandler() {
 	metricName := "PollCount"
 
 	url := fmt.Sprintf("http://localhost:8080/value/%s", metricName)

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/Jay-T/go-devops.git/internal/utils/metric"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -38,8 +39,8 @@ func TestSaveListToDB(t *testing.T) {
 		db: db,
 	}
 
-	mList := make([]Metric, 0, 43)
-	mList = []Metric{
+	mList := make([]metric.Metric, 0, 43)
+	mList = []metric.Metric{
 		{
 			ID:    "Alloc",
 			MType: gauge,
@@ -54,8 +55,9 @@ func TestSaveListToDB(t *testing.T) {
 		},
 	}
 
-	s := Service{
-		Metrics: map[string]Metric{},
+	s := GenericService{
+		Metrics:  map[string]metric.Metric{},
+		backuper: dbs,
 	}
 
 	mock.ExpectBegin()
@@ -64,14 +66,14 @@ func TestSaveListToDB(t *testing.T) {
 		stmt.ExpectExec().WillReturnResult(sqlmock.NewResult(1, 1))
 	}
 	mock.ExpectCommit()
-	err = s.saveListToDB(ctx, &mList, dbs)
+	err = s.saveListToDB(ctx, &mList)
 	assert.NoError(t, err)
 
 	mock.ExpectBegin()
 	mock.ExpectPrepare(`INSERT INTO metrics`).ExpectExec().WillReturnError(New("TestError"))
 	mock.ExpectRollback()
 
-	err = s.saveListToDB(ctx, &mList, dbs)
+	err = s.saveListToDB(ctx, &mList)
 	assert.Error(t, err)
 }
 

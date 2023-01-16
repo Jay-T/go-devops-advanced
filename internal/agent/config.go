@@ -19,6 +19,7 @@ const usage = `Usage of using_flag:
   -k string Encryption key (default "testkey")
   -p duration Metric poll interval (default 2s)
   -r duration Metric report to server interval (default 10s)
+  -intf string Local network interface
 `
 
 const (
@@ -27,6 +28,7 @@ const (
 	defaultPollInterval   time.Duration = time.Duration(2 * time.Second)
 	defaultCryptoKey      string        = ""
 	defaultKey            string        = ""
+	defaultLocalInterface string        = ""
 )
 
 // Config structure. Used for application configuration.
@@ -37,6 +39,7 @@ type Config struct {
 	Key            string        `env:"KEY"`
 	CryptoKey      string        `env:"CRYPTO_KEY"`
 	ConfigFile     string        `env:"CONFIG"`
+	GRPC           bool
 }
 
 type ConfigFile struct {
@@ -120,6 +123,7 @@ func GetConfig() (*Config, error) {
 	flag.StringVar(&c.Key, "k", defaultKey, "Encryption key")
 	flag.StringVar(&c.ConfigFile, "config", "", "Config file name")
 	flag.StringVar(&c.ConfigFile, "c", "", "Config file name")
+	flag.BoolVar(&c.GRPC, "grpc", false, "Run as gRPC service")
 	flag.Parse()
 	flag.Usage = func() { fmt.Print(usage) }
 	flag.Parse()
